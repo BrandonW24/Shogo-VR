@@ -23,7 +23,7 @@ https://youtu.be/d2rjNoYvyQU
 ## Features
 
 - **True stereo 3D** with 6DoF head tracking, and a world scale calibrated for on foot and in a mech.
-- **Motion controllers:** aim with your hand, two-handed aiming, snap or smooth turning, left-handed mode, transforming your mech, and easier ladders. Supports Meta Quest/Rift, Valve Index, HTC Vive and Windows Mixed Reality.
+- **Motion controllers:** aim with your hand, two-handed aiming, snap or smooth turning, left-handed mode, transforming your mech, and easier ladders. Supports Meta Quest/Rift, Valve Index, HTC Vive and Windows Mixed Reality controllers.
 - **A sharp HUD** on its own floating panel, with menus, cutscenes and loading screens on a floating screen.
 - **Your body** when you look down, Sanjuro or your mech, animated as you move.
 - **Picture quality:** frames go straight from the game's renderer to the headset, so your monitor doesn't limit them. On top of that come sharpening, upscaling and an optional comfort vignette.
@@ -33,7 +33,9 @@ https://youtu.be/d2rjNoYvyQU
 ## Requirements
 
 - Your own copy of **Shogo: Mobile Armor Division v2.2** ([Steam](https://store.steampowered.com/) or [GOG](https://www.gog.com/)).
-- A PC VR headset with SteamVR, and SteamVR set as the OpenXR runtime (*SteamVR → Settings → OpenXR → Set SteamVR as OpenXR Runtime*).
+- A **PC VR** headset with SteamVR, and SteamVR set as the OpenXR runtime (*SteamVR → Settings → OpenXR → Set SteamVR as OpenXR Runtime*).
+  - *(At the moment I have currently only tested this with SteamVR + OpenXR)*
+
 - Shogo running in a window. With dgVoodoo 2, set *Appearance* to *Windowed*; the mod takes care of the window's size.
 
 ## Install and play
