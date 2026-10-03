@@ -8,6 +8,12 @@
 
 **It's free**, and you need your own copy of the game.
 
+
+
+https://youtu.be/d2rjNoYvyQU
+
+
+
 > **THIS MOD IS NOT MADE BY OR SUPPORTED BY Monolith Productions, or any of its affiliates and subsidiaries.**
 
 **Created by:** *[Brandon Withington] — [brandon.f.withington@gmail.com]*
@@ -114,3 +120,4 @@ Building: `bridge/` and `launcher/` build with Visual Studio or MinGW-w64; see `
 ## In memory of Monolith Productions
 
 Shogo was made by Monolith Productions in 1998, and in 1999 they released its source code so players could keep building on it. This mod exists because of that generosity. Thank you.
+
