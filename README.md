@@ -36,7 +36,7 @@
 2. Start **Shogo VR** from your Desktop or Start menu and press **Play**.
 3. In the headset, look straight ahead and click the left thumbstick to recenter yourself in your 3d space.
 
-You can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. 
+If the ShogoVR launcher is unable to launch Shogo which unfortunately is quite common, you can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. If you know where your Shogo.exe install is, launch that and go into the advanced options and type this into the command line prompt `-rez ShogoVR`
 
 <p align="center"><img src="launcher/assets/info.png" alt="Shogo VR" width="720"></p>
 
@@ -53,7 +53,7 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 | Jump | A | Crouch | B (hold) |
 | Transform (mech) | tap B | Next weapon | right grip |
 | Menu | left menu button | Mission log | X |
-| Weapon list | Y or left grip | recenter | left stick click |
+| Weapon list | Y or left grip | Recentre | left stick click |
 
 - **Left-handed mode** mirrors all of this.
 - **Two-handed aiming:** hold your other hand in front of the gun, along the barrel.
@@ -65,7 +65,7 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 
 - **Resolution:** pick a high resolution in Shogo, such as 3840×2160. With NVIDIA DSR or AMD VSR enabled, those resolutions appear even on a 1080p desktop. The Shogo window may then be larger than your screen; that's expected.
 - **Video memory:** the mod sets dgVoodoo's emulated video memory to 2 GB, because its 256 MB default makes textures blurrier the longer you play. Your original `dgVoodoo.conf` is kept as `dgVoodoo.conf.shogovr-backup`.
-- **Hotkeys:** Ctrl+Shift+S (sharpening), Ctrl+Shift+U (upscaling), Ctrl+Shift+M (left-eye window), Ctrl+Shift+R (recenter), Ctrl+Shift+F (fix the game window).
+- **Hotkeys:** Ctrl+Shift+S (sharpening), Ctrl+Shift+U (upscaling), Ctrl+Shift+M (left-eye window), Ctrl+Shift+R (recentre), Ctrl+Shift+F (fix the game window).
 
 ## Troubleshooting
 
