@@ -75,7 +75,7 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 
 ## Troubleshooting
 
-Your new`ShogoVR` folder holds three logs, each rewritten every run. Please attach them to bug reports:
+Your new `ShogoVR` folder holds three logs, each rewritten every run. Please attach them to bug reports:
 
 - `ShogoVR_launch.log`: what the launcher did.
 - `ShogoVRBridge.log`: window, focus, capture and settings.
@@ -92,8 +92,13 @@ Your new`ShogoVR` folder holds three logs, each rewritten every run. Please atta
 ## Known Issues
 
 * Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.
+* The launcher will often not launch ShogoVR properly (lol), see above on how to launch the mod without the ShogoVR launcher
 * The game can and will crash at random.
+* The game will sometimes crash in the menu
 * VR body simulation is a bit wonky
+* Crouch in pilot/Sanjuro seems to be busted / not bound correctly at the moment
+* Clarity still needs some work
+* Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
 
 ## What's in this repository
 
