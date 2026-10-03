@@ -36,6 +36,8 @@ https://youtu.be/d2rjNoYvyQU
 
 - **A launcher with all the VR settings and rebindable button mapping menu** 
 
+  <p align="center"><img src="launcher/assets/settings_menu.png" alt="Shogo VR" width="640"></p>
+
   - **Note :** Your VR settings are also available in-game under *Options → vr settings*. Changes apply while you play.
 
   - Your button rebinding can be done from the launcher in its own tab as seen below : 
