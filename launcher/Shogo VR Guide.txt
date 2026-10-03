@@ -37,6 +37,10 @@ TWO-HANDED AIMING AND YOUR BODY
   model's parts if something that should be hidden isn't.
 
 IF SOMETHING GOES WRONG
+- Don't start ShogoVRBridge.exe by hand: the game starts it, with the same
+  rights as the game. (If Shogo runs as administrator, a bridge started
+  without them can't manage Shogo's window - Shogo then stays a small black
+  window.)
 - Logs in the ShogoVR folder record what happened and when:
   ShogoVR_launch.log (what the Shogo VR shortcut did),
   ShogoVRBridge.log (window, focus, capture, settings) and
@@ -82,9 +86,9 @@ BEST PICTURE
   limits it: pick a high resolution in Shogo, e.g. 3840x2160 (with NVIDIA
   DSR enabled, those resolutions appear even if your desktop stays 1080p).
   The Shogo window may then be bigger than your screen - that's expected.
-- A "left eye" window on the desktop shows what your left eye sees, flat,
-  with the HUD - record that with OBS ("Window Capture"). Ctrl+Shift+M
-  shows/hides it.
+- A "left eye" window on the desktop can show what your left eye sees,
+  flat, with the HUD - record that with OBS ("Window Capture"). It's off by
+  default: Ctrl+Shift+M (or VR Settings) turns it on.
 - Shogo VR sets dgVoodoo's emulated video memory to 2 GB (its default
   256 MB is too little at VR resolutions and makes textures blurrier the
   longer you play). Up to 4 GB can be chosen in Shogo VR Settings; if the

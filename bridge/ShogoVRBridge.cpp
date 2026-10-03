@@ -101,6 +101,21 @@ static HANDLE g_quitEvent = nullptr;		// set by ShogoVR.exe when the game has ex
 
 static HANDLE g_gameProcess = nullptr;	// set when the game started us: close when it ends
 
+// True if the process runs with administrator rights ("elevated").
+static bool IsElevated(HANDLE process)
+{
+	HANDLE token = nullptr;
+	bool elevated = false;
+	if (OpenProcessToken(process, TOKEN_QUERY, &token))
+	{
+		TOKEN_ELEVATION e = {};
+		DWORD size = 0;
+		if (GetTokenInformation(token, TokenElevation, &e, sizeof(e), &size)) elevated = e.TokenIsElevated != 0;
+		CloseHandle(token);
+	}
+	return elevated;
+}
+
 static void CheckQuitEvent()
 {
 	if (g_quitEvent && WaitForSingleObject(g_quitEvent, 0) == WAIT_OBJECT_0) g_quit = true;
@@ -1268,7 +1283,7 @@ private:
 	bool			m_directCapture = true;		// take frames straight from the game's renderer when it offers them
 	bool			m_usingDirect = false;
 	bool			m_oversize = false;			// window as big as the game's resolution, even beyond the screen
-	bool			m_spectatorOn = true;
+	bool			m_spectatorOn = false;		// off unless wanted (Ctrl+Shift+M / settings)
 	bool			m_spectatorKeyDown = false;
 	Spectator		m_spectator;
 	float			m_motion = 0.0f;			// 0..1 how hard the sticks move/turn you
@@ -2131,6 +2146,23 @@ void Bridge::HandleWindow(const GameInfo& g)
 	ULONGLONG now = GetTickCount64();
 	if (g.alive && !m_gameWasAlive)
 	{
+		// Windows doesn't let a normal program resize, restyle or focus the
+		// window of a program running as administrator.  If Shogo runs as
+		// administrator and we don't, step aside: the game starts a bridge
+		// with its own rights within a few seconds.
+		DWORD gamePid = 0;
+		if (g.hwnd) GetWindowThreadProcessId(g.hwnd, &gamePid);
+		HANDLE gameProc = gamePid ? OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, gamePid) : nullptr;
+		bool gameElevated = gameProc && IsElevated(gameProc);
+		if (gameProc) CloseHandle(gameProc);
+		if (gameElevated && !IsElevated(GetCurrentProcess()))
+		{
+			printf("\nShogo is running as administrator, and Windows won't let this bridge (not administrator)\n"
+				   "manage its window. Closing - the game starts its own bridge with matching rights.\n");
+			g_quit = true;
+			return;
+		}
+
 		// Back after a loading screen (the game pauses while it loads), or
 		// a fresh start of Shogo?  Only a fresh start gets the full welcome.
 		bool bFreshStart = (m_lastAliveTime == 0) || (now - m_lastAliveTime > 30000);
@@ -2603,7 +2635,7 @@ void Bridge::LoadSettings(bool bFirst)
 	GetPrivateProfileStringW(L"Comfort", L"Vignette", L"0", buf, 64, ini);
 	float vignette = std::max(0.0f, std::min(1.0f, (float)_wtof(buf)));
 	bool direct = GetPrivateProfileIntW(L"Picture", L"DirectCapture", 1, ini) != 0;
-	bool spectator = GetPrivateProfileIntW(L"Picture", L"Spectator", 1, ini) != 0;
+	bool spectator = GetPrivateProfileIntW(L"Picture", L"Spectator", 0, ini) != 0;
 
 	bool bChanged = sharpen != m_sharpen || upscale != m_upscale || keepFocus != m_keepFocus ||
 					leftHanded != m_leftHanded || vignette != m_vignette || direct != m_directCapture || spectator != m_spectatorOn;

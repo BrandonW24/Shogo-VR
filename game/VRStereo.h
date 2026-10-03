@@ -363,6 +363,8 @@ class CVRStereo
 		DBOOL		m_bTransformExt;
 		DBOOL		m_bWarnedNoTransformKey;
 		DBOOL		m_bStartedBridge;		// we started the headset bridge (and close it again)
+		int			m_nBridgeStarts;
+		DDWORD		m_nNextBridgeCheck;		// GetTickCount() of the next "is a bridge running?" check
 		char		m_szAuthors[200];		// from ShogoVR\AUTHORS.txt
 		DFLOAT		m_fNoticeStart;
 		HSURFACE	m_hNotice[2];

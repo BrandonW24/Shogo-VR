@@ -182,6 +182,8 @@ CVRStereo::CVRStereo()
 	m_bTransformExt			= DFALSE;
 	m_bWarnedNoTransformKey	= DFALSE;
 	m_bStartedBridge		= DFALSE;
+	m_nBridgeStarts			= 0;
+	m_nNextBridgeCheck		= 0;
 	m_szAuthors[0]			= 0;
 	m_fNoticeStart			= -1.0f;
 	m_hNotice[0] = m_hNotice[1] = DNULL;
@@ -1481,6 +1483,15 @@ void CVRStereo::UpdateBridge()
 {
 	if (!m_pClientDE) return;
 	CheckSettingsFile();
+
+	// Every few seconds: no bridge running (it stepped aside, crashed or was
+	// closed)?  Start one - from the game, so it has the game's own rights.
+	if ((long)(GetTickCount() - m_nNextBridgeCheck) >= 0)
+	{
+		m_nNextBridgeCheck = GetTickCount() + 5000;
+		if (!m_bBridgeAlive) StartBridgeIfNeeded();
+	}
+
 	if (!m_pShared) return;
 
 	if (!m_nGameHwnd)
@@ -2357,9 +2368,11 @@ void CVRStereo::StartBridgeIfNeeded()
 	if (hRunning)
 	{
 		CloseHandle(hRunning);
-		Log("Headset bridge already running");
+		if (!m_nBridgeStarts) Log("Headset bridge already running");
 		return;
 	}
+	if (m_nBridgeStarts >= 5) return;			// it keeps stopping - don't loop
+	m_nBridgeStarts++;
 
 	char szDir[320];
 	strncpy(szDir, m_szIniPath, sizeof(szDir) - 1);
@@ -2407,13 +2420,17 @@ void CVRStereo::RememberCommandLine()
 	Log("Command line: %s", szCmd);
 	if (strstr(szCmd, "+VRLauncher")) return;			// the shortcut started us - nothing new to learn
 
-	// Skip the program's own path (quoted or not).
+	// Skip the program's own path (quoted or not) - but some launchers leave
+	// it out and pass only the options, so never skip an option itself.
 	const char* p = szCmd;
 	while (*p == ' ') p++;
-	if (*p == '"') { p++; while (*p && *p != '"') p++; if (*p) p++; }
-	else { while (*p && *p != ' ') p++; }
-	while (*p == ' ') p++;
-	if (!*p) return;
+	if (*p != '-' && *p != '+')
+	{
+		if (*p == '"') { p++; while (*p && *p != '"') p++; if (*p) p++; }
+		else { while (*p && *p != ' ') p++; }
+		while (*p == ' ') p++;
+	}
+	if (!*p || !strstr(p, "-rez")) return;			// nothing worth remembering
 
 	// A leading '!' keeps the ini reader from stripping quotes off the ends.
 	char szValue[2048];

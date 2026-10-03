@@ -126,79 +126,102 @@ static int Play(const std::wstring& gameDir, const std::wstring& modDir)
 									: L"Couldn't change dgVoodoo's video memory (no permission?)");
 	}
 
-	// 1. The headset bridge (the game also starts it itself if needed).
+	// 1. The headset bridge: the game starts it itself, so it always has the
+	// game's own rights.  (Windows doesn't let a normal program manage the
+	// window of a game running as administrator - which is how Shogo runs on
+	// some PCs.)
 	PROCESS_INFORMATION bridge = {};
 	bool bStartedBridge = false;
-	if (!IsBridgeRunning())
-	{
-		std::wstring exe = JoinPath(modDir, L"ShogoVRBridge.exe");
-		std::wstring cmd = L"\"" + exe + L"\"";
-		STARTUPINFOW si = { sizeof(si) };
-		si.dwFlags = STARTF_USESHOWWINDOW;
-		si.wShowWindow = SW_SHOWMINNOACTIVE;
-		bStartedBridge = CreateProcessW(exe.c_str(), &cmd[0], nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE,
-										nullptr, modDir.c_str(), &si, &bridge) != 0;
-		LaunchLog(bStartedBridge ? L"Started the headset bridge" : L"Couldn't start the bridge: " + ErrorText(GetLastError()));
-	}
-	else LaunchLog(L"Headset bridge already running");
+	LaunchLog(IsBridgeRunning() ? L"A headset bridge is already running"
+								: L"The game will start the headset bridge itself");
 
-	// 2. The game's command line: the one Shogo was last started with on
-	// this PC (remembered by the mod), or else the standard one.
+	// 2. The game's command line.  Two candidates: the one Shogo was last
+	// started with on this PC (remembered by the mod - proven to work), and
+	// the standard one.  A remembered line is only trusted if it clearly
+	// loads Shogo's own archive.
 	wchar_t learned[4096] = L"";
 	GetPrivateProfileStringW(L"Launch", L"GameArgs", L"", learned, 4096, ini.c_str());
-	std::wstring args;
-	if (learned[0] == L'!' && learned[1])
+	std::wstring remembered = (learned[0] == L'!' && learned[1]) ? std::wstring(learned + 1) : std::wstring();
+	if (!remembered.empty())
 	{
-		args = learned + 1;
-		LaunchLog(L"Using the command line Shogo was last started with");
+		size_t first = remembered.find_first_not_of(L' ');
+		bool bStartsWell = first != std::wstring::npos && (remembered[first] == L'-' || remembered[first] == L'+');
+		if (!bStartsWell || !ContainsNoCase(remembered, L"-rez") || !ContainsNoCase(remembered, L"shogo.rez"))
+		{
+			LaunchLog(L"Not using the remembered command line (it doesn't load SHOGO.REZ properly): " + remembered);
+			remembered.clear();
+		}
 	}
-	else
-	{
-		args = BuildGameArgs(gameDir, L"");
-		LaunchLog(L"Using the standard command line (Shogo hasn't been started with the mod on this PC yet)");
-	}
-	if (!ContainsNoCase(args, L"shogovr")) args += L" -rez \"ShogoVR\"";
 
 	wchar_t extraBuf[2048] = L"";
 	GetPrivateProfileStringW(L"Launch", L"ExtraArgs", L"", extraBuf, 2048, ini.c_str());
-	if (extraBuf[0]) args += std::wstring(L" ") + extraBuf;
-	if (GetPrivateProfileIntW(L"Launch", L"SkipMovies", 0, ini.c_str()) != 0 && !ContainsNoCase(args, L"DisableMovies"))
-		args += L" +DisableMovies 1";
-	args += L" +VRLauncher 1";		// lets the game know this shortcut started it
+	bool bSkipMovies = GetPrivateProfileIntW(L"Launch", L"SkipMovies", 0, ini.c_str()) != 0;
+	auto finish = [&](std::wstring args)
+	{
+		if (!ContainsNoCase(args, L"shogovr")) args += L" -rez \"ShogoVR\"";
+		if (extraBuf[0]) args += std::wstring(L" ") + extraBuf;
+		if (bSkipMovies && !ContainsNoCase(args, L"DisableMovies")) args += L" +DisableMovies 1";
+		return args + L" +VRLauncher 1";		// lets the game know this shortcut started it
+	};
+
+	std::vector<std::pair<std::wstring, std::wstring>> attempts;	// (description, arguments)
+	if (!remembered.empty()) attempts.push_back({ L"the command line Shogo was last started with", finish(remembered) });
+	attempts.push_back({ L"the standard command line", finish(BuildGameArgs(gameDir, L"")) });
 
 	// 3. Start it through the Windows shell, like Shogo's own launcher - that
-	// honours compatibility settings such as "Run as administrator".
+	// honours compatibility settings such as "Run as administrator".  If it
+	// crashes straight away, try the other command line once.
 	std::wstring client = JoinPath(gameDir, L"Client.exe");
-	LaunchLog(L"Starting: \"" + client + L"\" " + args);
-	SHELLEXECUTEINFOW sei = { sizeof(sei) };
-	sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-	sei.lpVerb = L"open";
-	sei.lpFile = client.c_str();
-	sei.lpParameters = args.c_str();
-	sei.lpDirectory = gameDir.c_str();
-	sei.nShow = SW_SHOWNORMAL;
-	if (!ShellExecuteExW(&sei) || !sei.hProcess)
-	{
-		std::wstring err = ErrorText(GetLastError());
-		LaunchLog(L"Couldn't start Shogo: " + err);
-		QuitBridge(bStartedBridge, bridge);
-		OfferShogoLauncher(gameDir, L"Couldn't start Shogo:\n" + err);
-		return 1;
-	}
-
-	ULONGLONG started = GetTickCount64();
-	WaitForSingleObject(sei.hProcess, INFINITE);
+	ULONGLONG secs = 0;
 	DWORD code = 0;
-	GetExitCodeProcess(sei.hProcess, &code);
-	CloseHandle(sei.hProcess);
-	ULONGLONG secs = (GetTickCount64() - started) / 1000;
-	LaunchLog(L"Shogo closed after " + std::to_wstring(secs) + L" s (exit code " + std::to_wstring(code) + L")");
+	for (size_t attempt = 0; attempt < attempts.size(); ++attempt)
+	{
+		LaunchLog(L"Starting with " + attempts[attempt].first + L": \"" + client + L"\" " + attempts[attempt].second);
+		SHELLEXECUTEINFOW sei = { sizeof(sei) };
+		sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+		sei.lpVerb = L"open";
+		sei.lpFile = client.c_str();
+		sei.lpParameters = attempts[attempt].second.c_str();
+		sei.lpDirectory = gameDir.c_str();
+		sei.nShow = SW_SHOWNORMAL;
+		if (!ShellExecuteExW(&sei) || !sei.hProcess)
+		{
+			std::wstring err = ErrorText(GetLastError());
+			LaunchLog(L"Couldn't start Shogo: " + err);
+			QuitBridge(bStartedBridge, bridge);
+			OfferShogoLauncher(gameDir, L"Couldn't start Shogo:\n" + err);
+			return 1;
+		}
+
+		ULONGLONG started = GetTickCount64();
+		WaitForSingleObject(sei.hProcess, INFINITE);
+		code = 0;
+		GetExitCodeProcess(sei.hProcess, &code);
+		CloseHandle(sei.hProcess);
+		secs = (GetTickCount64() - started) / 1000;
+		wchar_t hex[16];
+		swprintf(hex, 16, L"0x%08X", code);
+		LaunchLog(L"Shogo closed after " + std::to_wstring(secs) + L" s (exit code " + hex + L")");
+
+		bool bCrashedEarly = secs < 10 && code != 0;
+		if (!bCrashedEarly || attempt + 1 >= attempts.size()) break;
+		LaunchLog(L"That looks like a crash at startup - trying " + attempts[attempt + 1].first);
+	}
 
 	// 4. Game over: close the bridge we started.
 	QuitBridge(bStartedBridge, bridge);
 
 	if (secs < 10)
-		OfferShogoLauncher(gameDir, L"Shogo closed right after starting (exit code " + std::to_wstring(code) + L").");
+	{
+		wchar_t hex[16];
+		swprintf(hex, 16, L"0x%08X", code);
+		std::wstring why = L"Shogo closed right after starting (exit code " + std::wstring(hex) + L").";
+		if (vramMB > 2048)
+			why += L"\n\nVideo memory is set to " + std::to_wstring(vramMB / 1024) + L" GB in VR Settings. Some old "
+				   L"games crash with more than 2 GB - try 2 GB.";
+		LaunchLog(L"Gave up: " + why);
+		OfferShogoLauncher(gameDir, why);
+	}
 	return 0;
 }
 

@@ -78,7 +78,7 @@ static std::vector<SettingDef> SettingDefs()
 	check (L"Launch", L"SkipMovies",	L"Skip the intro movies", 0, 1);
 	combo (L"Launch", L"VramMB",		L"Video memory (dgVoodoo)", 2048, { { L"Leave as it is", 0 }, { L"1 GB", 1024 }, { L"2 GB", 2048 }, { L"3 GB", 3072 }, { L"4 GB", 4096 } }, 1);
 	check (L"Picture", L"DirectCapture",	L"Take the picture straight from the game's renderer", 1, 1);
-	check (L"Picture", L"Spectator",	L"Left-eye window on the desktop (for recording)", 1, 1);
+	check (L"Picture", L"Spectator",	L"Left-eye window on the desktop (for recording)", 0, 1);
 	return d;
 }
 
