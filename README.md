@@ -41,8 +41,12 @@ https://youtu.be/d2rjNoYvyQU
 ## Install and play
 
 1. Download **ShogoVR-Setup.exe** from [Releases](../../releases) and run it. It finds Shogo, installs the mod into its own `ShogoVR` folder (your game files aren't changed) and adds the shortcuts.
+
 2. Start **Shogo VR** from your Desktop or Start menu and press **Play**.
-3. In the headset, look straight ahead and click the left thumbstick to recenter yourself in your 3d space.
+
+   <p align="center"><img src="launcher/assets/launcher_play.png" alt="Shogo VR" width="720"></p>
+
+3. In the headset, look straight ahead and click the left thumbstick to recenter yourself in your 3d space. You can also do this through the VR settings menu towards the bottom.
 
 If the ShogoVR launcher is unable to launch Shogo which unfortunately is quite common, you can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. If you know where your Shogo.exe install is, launch that and go into the advanced options and type this into the command line prompt `-rez ShogoVR`
 
