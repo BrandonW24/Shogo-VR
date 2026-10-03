@@ -115,7 +115,7 @@ Your new `ShogoVR` folder holds three logs, each rewritten every run. Please att
 
 If it helps, I find that these settings in particular can be the cause of a lot of crashes, generally speaking 2gb of video memory should be stable. Allocating more memory can lead to instability.
 
-Try disabling the last two bools as well. They are experimental features to record better footage with but they currently end up getting in the way.
+If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way.
 
 
 
