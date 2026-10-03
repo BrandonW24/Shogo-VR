@@ -123,6 +123,11 @@ An additional note, when ShogoVR crashes, there might be a left over ShogoVRBrid
 * Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
 * Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
 * Virtual Desktop displays the game entirely upside down
+* Launcher error `0xC0000005` is related to the launcher crashing
+* Vignetting does not seem to work properly
+* With Quest 3 & Quest 2 controllers there seems to be no way to bring up the in-game menu....
+  * **TODO: Make buttons rebindable & accessible from the launcher**
+
 
 ## What's in this repository
 
