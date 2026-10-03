@@ -58,6 +58,243 @@ static bool ContainsNoCase(std::wstring hay, std::wstring needle)
 	return hay.find(needle) != std::wstring::npos;
 }
 
+static bool g_assumeYes = false;		// --yes: answer the cleanup question automatically (testing)
+
+// A Shogo from an earlier session still running - typically one that crashed
+// and is being held open by Windows Error Reporting, or one that hung while
+// quitting?  A new Shogo started next to it can crash at once, so offer to
+// close it first.
+static bool CloseLeftoverGames(const std::wstring& gameDir)
+{
+	std::vector<DWORD> pids = FindGameProcesses(gameDir);
+	if (pids.empty()) return true;
+	LaunchLog(L"Found Shogo still running from an earlier session (" + std::to_wstring(pids.size()) + L" process(es))");
+	if (!g_assumeYes &&
+		MessageBoxW(nullptr, L"Shogo from an earlier session is still running in the background - it probably didn't close "
+							 L"properly (after a crash, Windows can keep it open for a while).\n\nClose it and start Shogo VR?",
+					SHOGOVR_PRODUCT, MB_YESNO | MB_ICONWARNING) != IDYES)
+	{
+		LaunchLog(L"Left it running");
+		return false;
+	}
+	bool bAll = true;
+	for (DWORD pid : pids)
+	{
+		HANDLE h = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pid);
+		if (h && TerminateProcess(h, 1))
+		{
+			WaitForSingleObject(h, 5000);
+			LaunchLog(L"Closed the earlier Shogo (process " + std::to_wstring(pid) + L")");
+		}
+		else
+		{
+			bAll = false;
+			LaunchLog(L"Couldn't close process " + std::to_wstring(pid) + L": " + ErrorText(GetLastError()));
+		}
+		if (h) CloseHandle(h);
+	}
+	if (!bAll)
+	{
+		Message(L"Couldn't close the earlier Shogo (it may be running as administrator). Please end Client.exe in "
+				L"Task Manager (Details tab), then start Shogo VR again.", MB_ICONWARNING);
+		return false;
+	}
+	Sleep(1500);		// let Windows and the graphics driver let go of it
+	return true;
+}
+
+// ----------------------------------------------------------------------- //
+//  Starting the game through Shogo's own launcher (Shogo.exe)
+// ----------------------------------------------------------------------- //
+
+struct TopWindowSearch { DWORD pid; HWND hwnd; };
+static BOOL CALLBACK FindTopWindowProc(HWND h, LPARAM lp)
+{
+	TopWindowSearch* f = (TopWindowSearch*)lp;
+	DWORD pid = 0;
+	GetWindowThreadProcessId(h, &pid);
+	if (pid == f->pid && IsWindowVisible(h) && !GetWindow(h, GW_OWNER)) { f->hwnd = h; return FALSE; }
+	return TRUE;
+}
+
+static BOOL CALLBACK FindLaunchButtonProc(HWND h, LPARAM lp)
+{
+	wchar_t cls[32] = L"", text[128] = L"";
+	GetClassNameW(h, cls, 32);
+	if (_wcsicmp(cls, L"Button") != 0) return TRUE;
+	GetWindowTextW(h, text, 128);
+	std::wstring t;
+	for (const wchar_t* c = text; *c; ++c) if (*c != L'&') t += *c;		// "&Launch Shogo" -> "Launch Shogo"
+	if (ContainsNoCase(t, L"launch shogo") || _wcsicmp(t.c_str(), L"Launch") == 0 || _wcsicmp(t.c_str(), L"Play") == 0)
+	{
+		*(HWND*)lp = h;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static bool FileTimeAfter(const std::wstring& path, const FILETIME& since)
+{
+	WIN32_FILE_ATTRIBUTE_DATA fa;
+	return GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fa) && CompareFileTime(&fa.ftLastWriteTime, &since) > 0;
+}
+
+// Opens Shogo's own launcher and presses "Launch Shogo" - exactly the way the
+// game starts when the player does it by hand, with the options saved in that
+// launcher (Advanced: -rez ShogoVR, other mods), the same rights and the same
+// compatibility settings.  Returns the exit code, or -1 if Shogo.exe can't be
+// used (then the caller starts Client.exe directly).
+static int PlayViaShogoLauncher(const std::wstring& gameDir, const std::wstring& modDir, int vramMB)
+{
+	std::wstring shogoExe = JoinPath(gameDir, L"Shogo.exe");
+	std::wstring gameLog = JoinPath(modDir, L"ShogoVR_game.log");
+
+	for (int attempt = 0; attempt < 2; ++attempt)
+	{
+		FILETIME launchTime;
+		GetSystemTimeAsFileTime(&launchTime);
+
+		// 1. Shogo's launcher: one that's already open, or a new one.
+		std::vector<DWORD> open = FindProcessesByPath(shogoExe);
+		DWORD pid = open.empty() ? 0 : open[0];
+		if (!pid)
+		{
+			std::wstring cmd = L"\"" + shogoExe + L"\"";
+			STARTUPINFOW si = { sizeof(si) };
+			PROCESS_INFORMATION pi = {};
+			if (CreateProcessW(shogoExe.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, gameDir.c_str(), &si, &pi))
+			{
+				pid = pi.dwProcessId;
+				CloseHandle(pi.hThread);
+				CloseHandle(pi.hProcess);
+				LaunchLog(L"Opened Shogo's own launcher (Shogo.exe)");
+			}
+			else
+			{
+				DWORD err = GetLastError();
+				if (err == ERROR_ELEVATION_REQUIRED && !IsProcessElevated(GetCurrentProcess()))
+				{
+					// Shogo.exe runs as administrator: Windows only lets a program with the
+					// same rights press its button, so come back with them (one prompt,
+					// the same one Shogo.exe itself would show).
+					LaunchLog(L"Shogo's launcher runs as administrator - restarting the Shogo VR launcher with the same rights");
+					std::wstring self = ExePath();
+					std::wstring params = std::wstring(L"--play") + (g_assumeYes ? L" --yes" : L"");
+					HINSTANCE r = ShellExecuteW(nullptr, L"runas", self.c_str(), params.c_str(), modDir.c_str(), SW_SHOWNORMAL);
+					if ((INT_PTR)r > 32) return 0;
+					LaunchLog(L"Not restarted with administrator rights (" + ErrorText(GetLastError()) + L")");
+				}
+				else LaunchLog(L"Couldn't open Shogo's launcher: " + ErrorText(err));
+				return -1;
+			}
+		}
+
+		// 2. Press "Launch Shogo".
+		HWND button = nullptr;
+		for (int i = 0; i < 80 && !button; ++i)			// up to 20 seconds
+		{
+			TopWindowSearch f = { pid, nullptr };
+			EnumWindows(FindTopWindowProc, (LPARAM)&f);
+			if (f.hwnd)
+			{
+				HWND b = nullptr;
+				EnumChildWindows(f.hwnd, FindLaunchButtonProc, (LPARAM)&b);
+				if (b && IsWindowEnabled(b)) button = b;
+			}
+			if (!button) Sleep(250);
+		}
+		if (button)
+		{
+			Sleep(300);
+			PostMessageW(button, BM_CLICK, 0, 0);
+			LaunchLog(L"Pressed \"Launch Shogo\"");
+		}
+		else LaunchLog(L"Couldn't find the \"Launch Shogo\" button - leaving Shogo's launcher open for you to press it");
+
+		// 3. Wait for the game to appear.
+		DWORD gamePid = 0;
+		ULONGLONG t0 = GetTickCount64(), limit = button ? 60000 : 600000;
+		while (GetTickCount64() - t0 < limit)
+		{
+			std::vector<DWORD> g = FindGameProcesses(gameDir);
+			if (!g.empty()) { gamePid = g[0]; break; }
+			if (FindProcessesByPath(shogoExe).empty() && GetTickCount64() - t0 > 3000) break;	// launcher closed, no game
+			Sleep(200);
+		}
+		if (!gamePid)
+		{
+			LaunchLog(L"Shogo didn't start from its launcher");
+			if (attempt == 0) { Sleep(1500); continue; }
+			return -1;
+		}
+		LaunchLog(L"Shogo is running (process " + std::to_wstring(gamePid) + L")");
+
+		// 4. Until it ends: did the VR mod load?
+		HANDLE h = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, gamePid);
+		ULONGLONG started = GetTickCount64();
+		bool modSeen = false, warned = false;
+		for (;;)
+		{
+			if (h) { if (WaitForSingleObject(h, 500) == WAIT_OBJECT_0) break; }
+			else
+			{
+				std::vector<DWORD> g = FindGameProcesses(gameDir);
+				if (std::find(g.begin(), g.end(), gamePid) == g.end()) break;
+				Sleep(500);
+			}
+			if (!modSeen && FileTimeAfter(gameLog, launchTime))
+			{
+				modSeen = true;
+				LaunchLog(L"The VR mod is running");
+			}
+			if (!modSeen && !warned && GetTickCount64() - started > 15000)
+			{
+				warned = true;
+				LaunchLog(L"Shogo is running without the VR mod (-rez ShogoVR is missing from Shogo's launcher)");
+				if (!g_assumeYes)
+					MessageBoxW(nullptr, L"Shogo started without the VR mod.\n\nIn Shogo's own launcher click Advanced..., put -rez ShogoVR "
+										 L"in the Command-Line box, tick \"Always specify these command-line parameters\", click OK - "
+										 L"then quit Shogo and start Shogo VR again.",
+								SHOGOVR_PRODUCT, MB_OK | MB_ICONWARNING | MB_TOPMOST | MB_SETFOREGROUND);
+			}
+		}
+		DWORD code = 0;
+		bool haveCode = h && GetExitCodeProcess(h, &code);
+		if (h) CloseHandle(h);
+		ULONGLONG secs = (GetTickCount64() - started) / 1000;
+		if (!modSeen && FileTimeAfter(gameLog, launchTime)) modSeen = true;
+		if (!modSeen && !warned && secs >= 5)
+		{
+			LaunchLog(L"Shogo ran without the VR mod (-rez ShogoVR is missing from Shogo's launcher)");
+			if (!g_assumeYes)
+				MessageBoxW(nullptr, L"Shogo ran without the VR mod.\n\nIn Shogo's own launcher click Advanced..., put -rez ShogoVR "
+									 L"in the Command-Line box, tick \"Always specify these command-line parameters\", click OK, "
+									 L"then start Shogo VR again.", SHOGOVR_PRODUCT, MB_OK | MB_ICONWARNING);
+		}
+		wchar_t hex[16];
+		swprintf(hex, 16, L"0x%08X", code);
+		LaunchLog(L"Shogo closed after " + std::to_wstring(secs) + L" s" + (haveCode ? L" (exit code " + std::wstring(hex) + L")" : L""));
+
+		bool bCrashedEarly = secs < 10 && (!haveCode || code != 0);
+		if (!bCrashedEarly) return 0;
+		if (attempt == 0)
+		{
+			LaunchLog(L"That looks like a crash at startup - waiting a moment and trying again");
+			Sleep(3000);
+			CloseLeftoverGames(gameDir);
+			continue;
+		}
+		std::wstring why = L"Shogo closed right after starting" + (haveCode ? L" (exit code " + std::wstring(hex) + L")" : std::wstring()) + L".";
+		if (vramMB > 2048)
+			why += L"\n\nVideo memory is set to " + std::to_wstring(vramMB / 1024) + L" GB in VR Settings. Some old games crash with more than 2 GB - try 2 GB.";
+		why += L"\n\nA log of what happened is in ShogoVR_launch.log in the ShogoVR folder.";
+		LaunchLog(L"Gave up: " + why);
+		Message(why, MB_ICONWARNING);
+		return 1;
+	}
+	return 1;
+}
+
 static void QuitBridge(bool bStarted, PROCESS_INFORMATION& bridge)
 {
 	if (!bStarted) return;
@@ -70,12 +307,16 @@ static void QuitBridge(bool bStarted, PROCESS_INFORMATION& bridge)
 
 // Offer Shogo's own launcher - once started that way (with -rez ShogoVR),
 // the game remembers its command line and this shortcut reuses it.
-static void OfferShogoLauncher(const std::wstring& gameDir, const std::wstring& why)
+static void OfferShogoLauncher(const std::wstring& gameDir, const std::wstring& why, bool bKnownGood = false)
 {
 	std::wstring shogoExe = JoinPath(gameDir, L"Shogo.exe");
 	bool bHave = FileExists(shogoExe);
 	std::wstring text = why + L"\n\n";
-	if (bHave)
+	if (bHave && bKnownGood)
+		text += L"Shogo starts fine from its own launcher (Shogo.exe) on this PC, and the headset bridge starts by "
+				L"itself that way too. A log of what happened is in ShogoVR_launch.log in the ShogoVR folder.\n\n"
+				L"Open Shogo's launcher now?";
+	else if (bHave)
 		text += L"If Shogo starts fine from its own launcher (Shogo.exe), start it that way once, with -rez ShogoVR "
 				L"under Advanced. Shogo VR then remembers exactly how the game is started on this PC, and this "
 				L"shortcut will work from then on (the headset bridge starts by itself either way).\n\n"
@@ -172,40 +413,95 @@ static int Play(const std::wstring& gameDir, const std::wstring& modDir)
 	// honours compatibility settings such as "Run as administrator".  If it
 	// crashes straight away, try the other command line once.
 	std::wstring client = JoinPath(gameDir, L"Client.exe");
+	if (!CloseLeftoverGames(gameDir)) return 1;
+
+	// Preferred: through Shogo's own launcher - the way that works on every
+	// PC where the game itself works.  Starting Client.exe directly is the
+	// fallback (no Shogo.exe, or chosen in VR Settings).
+	int method = GetPrivateProfileIntW(L"Launch", L"Method", 0, ini.c_str());
+	if (method == 0 && FileExists(JoinPath(gameDir, L"Shogo.exe")))
+	{
+		int r = PlayViaShogoLauncher(gameDir, modDir, vramMB);
+		if (r >= 0) return r;
+		LaunchLog(L"Falling back to starting Client.exe directly");
+	}
+
+	// Each command line gets two tries: a crash right at startup is often a
+	// one-off (the graphics driver or Windows still busy with a previous run).
 	ULONGLONG secs = 0;
 	DWORD code = 0;
-	for (size_t attempt = 0; attempt < attempts.size(); ++attempt)
+	const size_t kTries = 2;
+	for (size_t t = 0; t < attempts.size() * kTries; ++t)
 	{
-		LaunchLog(L"Starting with " + attempts[attempt].first + L": \"" + client + L"\" " + attempts[attempt].second);
-		SHELLEXECUTEINFOW sei = { sizeof(sei) };
-		sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-		sei.lpVerb = L"open";
-		sei.lpFile = client.c_str();
-		sei.lpParameters = attempts[attempt].second.c_str();
-		sei.lpDirectory = gameDir.c_str();
-		sei.nShow = SW_SHOWNORMAL;
-		if (!ShellExecuteExW(&sei) || !sei.hProcess)
+		size_t attempt = t / kTries;
+		// Exactly the way Shogo's own launcher does it: the program's name
+		// alone ("Client.exe"), not its full path.  The 1998 engine reads the
+		// whole command line, and a folder name like "Shogo - Mobile Armor
+		// Division" (GOG) has a lone "-" in it that it mistakes for an option.
+		std::wstring cmd = L"Client.exe " + attempts[attempt].second;
+		LaunchLog(L"Starting with " + attempts[attempt].first + L": " + cmd);
+		HANDLE hGame = nullptr;
+		STARTUPINFOW si = { sizeof(si) };
+		PROCESS_INFORMATION pi = {};
+		if (CreateProcessW(client.c_str(), &cmd[0], nullptr, nullptr, FALSE, 0, nullptr, gameDir.c_str(), &si, &pi))
 		{
-			std::wstring err = ErrorText(GetLastError());
-			LaunchLog(L"Couldn't start Shogo: " + err);
-			QuitBridge(bStartedBridge, bridge);
-			OfferShogoLauncher(gameDir, L"Couldn't start Shogo:\n" + err);
-			return 1;
+			CloseHandle(pi.hThread);
+			hGame = pi.hProcess;
+		}
+		else
+		{
+			DWORD err = GetLastError();
+			if (err == ERROR_ELEVATION_REQUIRED)
+			{
+				// It needs administrator rights: go through the Windows shell
+				// (which asks), using the short 8.3 path so the folder name
+				// can't confuse the engine.
+				wchar_t shortPath[MAX_PATH * 2] = L"";
+				std::wstring file = client;
+				if (GetShortPathNameW(client.c_str(), shortPath, MAX_PATH * 2) && shortPath[0]) file = shortPath;
+				LaunchLog(L"Shogo needs administrator rights - starting it through the Windows shell as " + file);
+				SHELLEXECUTEINFOW sei = { sizeof(sei) };
+				sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+				sei.lpVerb = L"open";
+				sei.lpFile = file.c_str();
+				sei.lpParameters = attempts[attempt].second.c_str();
+				sei.lpDirectory = gameDir.c_str();
+				sei.nShow = SW_SHOWNORMAL;
+				if (ShellExecuteExW(&sei) && sei.hProcess) hGame = sei.hProcess;
+				else err = GetLastError();
+			}
+			if (!hGame)
+			{
+				std::wstring errText = ErrorText(err);
+				LaunchLog(L"Couldn't start Shogo: " + errText);
+				QuitBridge(bStartedBridge, bridge);
+				OfferShogoLauncher(gameDir, L"Couldn't start Shogo:\n" + errText, learned[0] == L'!');
+				return 1;
+			}
 		}
 
 		ULONGLONG started = GetTickCount64();
-		WaitForSingleObject(sei.hProcess, INFINITE);
+		WaitForSingleObject(hGame, INFINITE);
 		code = 0;
-		GetExitCodeProcess(sei.hProcess, &code);
-		CloseHandle(sei.hProcess);
+		GetExitCodeProcess(hGame, &code);
+		CloseHandle(hGame);
 		secs = (GetTickCount64() - started) / 1000;
 		wchar_t hex[16];
 		swprintf(hex, 16, L"0x%08X", code);
 		LaunchLog(L"Shogo closed after " + std::to_wstring(secs) + L" s (exit code " + hex + L")");
 
 		bool bCrashedEarly = secs < 10 && code != 0;
-		if (!bCrashedEarly || attempt + 1 >= attempts.size()) break;
-		LaunchLog(L"That looks like a crash at startup - trying " + attempts[attempt + 1].first);
+		if (!bCrashedEarly || t + 1 >= attempts.size() * kTries) break;
+		if ((t + 1) % kTries != 0)
+		{
+			LaunchLog(L"That looks like a crash at startup - waiting a moment and trying again");
+			Sleep(3000);
+			CloseLeftoverGames(gameDir);		// in case the crashed one is still held open
+		}
+		else
+		{
+			LaunchLog(L"Still crashing - trying " + attempts[attempt + 1].first);
+		}
 	}
 
 	// 4. Game over: close the bridge we started.
@@ -220,7 +516,7 @@ static int Play(const std::wstring& gameDir, const std::wstring& modDir)
 			why += L"\n\nVideo memory is set to " + std::to_wstring(vramMB / 1024) + L" GB in VR Settings. Some old "
 				   L"games crash with more than 2 GB - try 2 GB.";
 		LaunchLog(L"Gave up: " + why);
-		OfferShogoLauncher(gameDir, why);
+		OfferShogoLauncher(gameDir, why, learned[0] == L'!');
 	}
 	return 0;
 }
@@ -591,6 +887,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 		if (_wcsicmp(argv[i], L"--quiet") == 0) bQuiet = true;
 		if (_wcsicmp(argv[i], L"--settings") == 0) bSettings = true;
 		if (_wcsicmp(argv[i], L"--play") == 0) bPlay = true;
+		if (_wcsicmp(argv[i], L"--yes") == 0) g_assumeYes = true;
 	}
 	LocalFree(argv);
 

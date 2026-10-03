@@ -23,6 +23,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <tlhelp32.h>
 
 #define SHOGOVR_PRODUCT			L"Shogo VR"
 #define SHOGOVR_UNINSTALL_KEY	L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ShogoVR"
@@ -348,8 +349,12 @@ static std::wstring BuildGameArgs(const std::wstring& gameDir, const std::wstrin
 			args += L"-rez \"" + rel + L"\"";
 		}
 	};
+	// The same shape as Shogo's own launcher: window title, the base game,
+	// the Custom folder, the map packs, single player.
+	args = L"-windowtitle Shogo";
 	addRez(L"SHOGO.REZ");
 	addRez(L"SOUND.REZ");
+	addRez(L"Custom");
 
 	std::vector<std::wstring> packs;
 	WIN32_FIND_DATAW fd;
@@ -362,6 +367,7 @@ static std::wstring BuildGameArgs(const std::wstring& gameDir, const std::wstrin
 	std::sort(packs.begin(), packs.end(), [](const std::wstring& a, const std::wstring& b) { return _wcsicmp(a.c_str(), b.c_str()) < 0; });
 	for (auto& p : packs) addRez(p);
 
+	args += L" +multiplayer 0";
 	addRez(SHOGOVR_MOD_FOLDER);
 	if (!extra.empty()) args += L" " + extra;
 	return args;
@@ -484,4 +490,68 @@ static int FixDgVoodooVram(const std::wstring& gameDir, int targetMB, bool bOnly
 		return 0;		// dgVoodoo's own config takes priority even without a VRAM line
 	}
 	return 0;
+}
+
+// ======================================================================= //
+//  Running copies of the game
+// ======================================================================= //
+
+// Client.exe processes started from this game folder (e.g. one left behind
+// by a crash, still held by Windows Error Reporting).
+static std::vector<DWORD> FindGameProcesses(const std::wstring& gameDir)
+{
+	std::vector<DWORD> pids;
+	std::wstring want = JoinPath(gameDir, L"Client.exe");
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snap == INVALID_HANDLE_VALUE) return pids;
+	PROCESSENTRY32W pe = { sizeof(pe) };
+	for (BOOL ok = Process32FirstW(snap, &pe); ok; ok = Process32NextW(snap, &pe))
+	{
+		if (_wcsicmp(pe.szExeFile, L"Client.exe") != 0) continue;
+		HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+		if (!h) { pids.push_back(pe.th32ProcessID); continue; }		// can't check its path: count it
+		wchar_t path[2048];
+		DWORD len = 2048;
+		if (QueryFullProcessImageNameW(h, 0, path, &len) && _wcsicmp(path, want.c_str()) == 0) pids.push_back(pe.th32ProcessID);
+		CloseHandle(h);
+	}
+	CloseHandle(snap);
+	return pids;
+}
+
+// Processes running a given program file (full path).
+static std::vector<DWORD> FindProcessesByPath(const std::wstring& exePath)
+{
+	std::vector<DWORD> pids;
+	size_t slash = exePath.find_last_of(L"\\/");
+	std::wstring name = slash == std::wstring::npos ? exePath : exePath.substr(slash + 1);
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snap == INVALID_HANDLE_VALUE) return pids;
+	PROCESSENTRY32W pe = { sizeof(pe) };
+	for (BOOL ok = Process32FirstW(snap, &pe); ok; ok = Process32NextW(snap, &pe))
+	{
+		if (_wcsicmp(pe.szExeFile, name.c_str()) != 0) continue;
+		HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+		if (!h) continue;
+		wchar_t path[2048];
+		DWORD len = 2048;
+		if (QueryFullProcessImageNameW(h, 0, path, &len) && _wcsicmp(path, exePath.c_str()) == 0) pids.push_back(pe.th32ProcessID);
+		CloseHandle(h);
+	}
+	CloseHandle(snap);
+	return pids;
+}
+
+static bool IsProcessElevated(HANDLE process)
+{
+	HANDLE token = nullptr;
+	bool elevated = false;
+	if (OpenProcessToken(process, TOKEN_QUERY, &token))
+	{
+		TOKEN_ELEVATION e = {};
+		DWORD size = 0;
+		if (GetTokenInformation(token, TokenElevation, &e, sizeof(e), &size)) elevated = e.TokenIsElevated != 0;
+		CloseHandle(token);
+	}
+	return elevated;
 }

@@ -281,7 +281,8 @@ static bool DoInstall(const std::vector<PakFile>& files, const std::wstring& gam
 
 	summary = L"Shogo VR is installed in:\n" + modDir + L"\n\n";
 	summary += L"Start it with the \"Shogo VR\" shortcut" + std::wstring(o.desktop ? L" on your Desktop or" : L" in") + L" the Start menu. ";
-	summary += L"You can also start Shogo as usual with -rez ShogoVR on its command line - the headset bridge starts by itself.";
+	summary += L"It starts the game through Shogo's own launcher, so do this once: open Shogo.exe, click Advanced..., put -rez ShogoVR "
+			   L"in the Command-Line box, tick \"Always specify these command-line parameters\" and click OK.";
 	if (nVram > 0) summary += L"\n\nRaised dgVoodoo's video memory to 2 GB (the original settings are saved as " + vramFile + L".shogovr-backup).";
 	std::wstring runtime = RegReadString(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Khronos\\OpenXR\\1", L"ActiveRuntime", KEY_WOW64_64KEY);
 	if (runtime.empty())

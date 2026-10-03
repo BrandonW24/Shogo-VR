@@ -2286,14 +2286,17 @@ int CVRStereo::SetArmNodesHidden(HLOCALOBJ hObj, DBOOL bHide)
 		int i;
 		for (i = 0; szName[i] && i < 63; i++) szLower[i] = (char)tolower((unsigned char)szName[i]);
 		szLower[i] = 0;
-		for (i = 0; s_arms[i]; i++)
+		// Monolith's first-person models name the hand parts R_Arm, Right_Palm,
+		// R_pointer_base, R_pinky_tip... (see ShogoVR_models.txt), while the
+		// gun's parts have names like cyl8 or extru6.
+		DBOOL bArm = (strncmp(szLower, "r_", 2) == 0 || strncmp(szLower, "l_", 2) == 0 ||
+					  strncmp(szLower, "r-", 2) == 0 || strncmp(szLower, "l-", 2) == 0 ||
+					  strncmp(szLower, "right_", 6) == 0 || strncmp(szLower, "left_", 5) == 0);
+		for (i = 0; !bArm && s_arms[i]; i++) if (strstr(szLower, s_arms[i])) bArm = DTRUE;
+		if (bArm)
 		{
-			if (strstr(szLower, s_arms[i]))
-			{
-				m_pClientDE->SetModelNodeHideStatus(hObj, szName, bHide);
-				nCount++;
-				break;
-			}
+			m_pClientDE->SetModelNodeHideStatus(hObj, szName, bHide);
+			nCount++;
 		}
 	}
 	return nCount;

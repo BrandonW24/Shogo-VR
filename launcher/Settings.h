@@ -62,6 +62,7 @@ static std::vector<SettingDef> SettingDefs()
 	check (L"Game",	L"VRBody",			L"Show your body",		1,	0);
 	check (L"Game",	L"VRBodyArms",		L"Show the body's arms (they can't follow your hands)", 0, 0);
 	check (L"Game",	L"VREasyLadders",	L"Easy ladders (the stick climbs up and down)", 1, 0);
+	combo (L"Launch", L"Method",		L"Start the game",		0,	{ { L"Through Shogo's own launcher", 0 }, { L"Directly (Client.exe)", 1 } }, 0);
 
 	// Column 1: HUD, screens and picture
 	slider(L"Game",	L"VRHudWidth",		L"HUD width",			60,	30, 110, 1, 1, L"\u00B0", 1);

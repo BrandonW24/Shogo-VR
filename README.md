@@ -122,6 +122,7 @@ An additional note, when ShogoVR crashes, there might be a left over ShogoVRBrid
 * Clarity still needs some work
 * Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
 * Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
+* Virtual Desktop displays the game entirely upside down
 
 ## What's in this repository
 

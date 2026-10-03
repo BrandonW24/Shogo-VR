@@ -49,9 +49,13 @@ IF SOMETHING GOES WRONG
   report before playing again.
 
 PLAYING
-- Start "Shogo VR" from your Desktop or Start menu and press Play. It
-  starts the headset bridge and the game, and closes the bridge when you
-  quit Shogo. The launcher's VR Settings tab has all the VR options.
+- Once only: open Shogo's own launcher (Shogo.exe), click Advanced..., put
+  -rez ShogoVR in the Command-Line box, tick "Always specify these
+  command-line parameters" and click OK.
+- Then start "Shogo VR" from your Desktop or Start menu and press Play. It
+  starts the game through Shogo's own launcher (pressing Launch Shogo for
+  you), and the game starts the headset bridge. The launcher's VR Settings
+  tab has all the VR options.
 - Or start Shogo any way you normally do (Shogo.exe, Steam's Play button)
   with -rez ShogoVR on its command line (Shogo.exe: Advanced). The mod
   starts the headset bridge by itself and closes it when you quit - no need
