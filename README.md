@@ -110,7 +110,9 @@ An additional note, when ShogoVR crashes, there might be a left over ShogoVRBrid
 * The game can and will crash at random.
 * The game will sometimes crash in the menu
 * VR body simulation is a bit wonky
-* Crouch in pilot/Sanjuro seems to be busted / not bound correctly at the moment
+* ~~Crouch in pilot/Sanjuro mode seems to be busted / not bound correctly at the moment~~
+  * It does work and is correctly bound, only your view point does not change to give you the feeling that you are crouching, will fix!
+
 * Clarity still needs some work
 * Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
 * Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
