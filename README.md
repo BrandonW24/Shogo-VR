@@ -89,6 +89,20 @@ Your new `ShogoVR` folder holds three logs, each rewritten every run. Please att
 
  The mod remembers that working command line, and the launcher uses it from then on.
 
+
+
+If it helps, I find that these settings in particular can be the cause of a lot of crashes, generally speaking 2gb of video memory should be stable. Allocating more memory can lead to instability.
+
+Try disabling the last two bools as well. They are experimental features to record better footage with but they currently end up getting in the way.
+
+
+
+<p align="center"><img src="launcher/assets/troubleshooting_1.jpg" alt="Shogo VR" width="720"></p>
+
+
+
+An additional note, when ShogoVR crashes, there might be a left over ShogoVRBridge process that you will need to end in your task manager. It does not have a window so it is really easy to miss.
+
 ## Known Issues
 
 * Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.
