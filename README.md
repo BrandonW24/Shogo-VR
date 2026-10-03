@@ -4,11 +4,13 @@
 
 **Play Shogo: Mobile Armor Division (1998) in a PC VR headset.**
 
-Shogo VR is an **unofficial VR mod**, unaffiliated with Monolith Productions or any of its affiliates and subsidiaries. It's free, and you need your own copy of the game.
+**Shogo VR** is an **unofficial VR mod**, unaffiliated with Monolith Productions or any of its affiliates and subsidiaries. 
 
-> **THIS LEVEL IS NOT MADE BY OR SUPPORTED BY Monolith Productions, or any of its affiliates and subsidiaries.**
+**It's free**, and you need your own copy of the game.
 
-**Created by:** *[Brandon Withington] — [brandon.f.withington@gmail.com]* (also in [AUTHORS.txt](AUTHORS.txt))
+> **THIS MOD IS NOT MADE BY OR SUPPORTED BY Monolith Productions, or any of its affiliates and subsidiaries.**
+
+**Created by:** *[Brandon Withington] — [brandon.f.withington@gmail.com]*
 
 <p align="center"><img src="launcher/assets/banner.jpg" alt="Shogo VR" width="640"></p>
 
@@ -32,9 +34,13 @@ Shogo VR is an **unofficial VR mod**, unaffiliated with Monolith Productions or 
 
 1. Download **ShogoVR-Setup.exe** from [Releases](../../releases) and run it. It finds Shogo, installs the mod into its own `ShogoVR` folder (your game files aren't changed) and adds the shortcuts.
 2. Start **Shogo VR** from your Desktop or Start menu and press **Play**.
-3. In the headset, look straight ahead and click the left thumbstick to recentre.
+3. In the headset, look straight ahead and click the left thumbstick to recenter yourself in your 3d space.
 
-You can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. To uninstall, use *Windows Settings → Apps → Installed apps → Shogo VR*.
+You can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. 
+
+<p align="center"><img src="launcher/assets/info.png" alt="Shogo VR" width="720"></p>
+
+To uninstall, use *Windows Settings → Apps → Installed apps → Shogo VR*.
 
 The installer and launcher aren't code-signed. If Windows shows "Windows protected your PC", choose *More info → Run anyway*.
 
@@ -63,13 +69,19 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 
 ## Troubleshooting
 
-The `ShogoVR` folder holds three logs, each rewritten every run. Please attach them to bug reports:
+Your new`ShogoVR` folder holds three logs, each rewritten every run. Please attach them to bug reports:
 
 - `ShogoVR_launch.log`: what the launcher did.
 - `ShogoVRBridge.log`: window, focus, capture and settings.
 - `ShogoVR_game.log`: player mode, camera FOV, zoom, resolution and renderer events.
 
-If the launcher can't start the game on your PC, start Shogo once from `Shogo.exe` with `-rez ShogoVR`. The mod remembers that working command line, and the launcher uses it from then on.
+**If the launcher can't start the game on your PC, or if it crashes before you see anything in your VR headset**, start Shogo once from `Shogo.exe` with `-rez ShogoVR` in the advanced options in the command line like the following : 
+
+<p align="center"><img src="launcher/assets/info.png" alt="Shogo VR" width="720"></p>
+
+
+
+ The mod remembers that working command line, and the launcher uses it from then on.
 
 ## What's in this repository
 
