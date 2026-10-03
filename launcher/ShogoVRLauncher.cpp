@@ -19,6 +19,7 @@
 #include "Common.h"
 #include "Gui.h"
 #include "Settings.h"
+#include "Bindings.h"
 #include <shellapi.h>
 #include <cwctype>
 
@@ -578,7 +579,7 @@ static int Uninstall(const std::wstring& modDir, bool bQuiet)
 // ======================================================================= //
 
 enum { IDC_TABS = 3000, IDC_PLAY, IDC_CLOSE, IDC_OPEN_SHOGO, IDC_OPEN_FOLDER, IDC_ABOUT_TEXT, IDC_RESET };
-enum { PAGE_PLAY = 0, PAGE_SETTINGS, PAGE_ABOUT };
+enum { PAGE_PLAY = 0, PAGE_SETTINGS, PAGE_BUTTONS, PAGE_ABOUT };
 
 struct LauncherUI
 {
@@ -591,6 +592,7 @@ struct LauncherUI
 	HWND			tabs = nullptr, playBtn = nullptr, closeBtn = nullptr, openShogo = nullptr, openFolder = nullptr;
 	HWND			about = nullptr, resetBtn = nullptr;
 	SettingsUI		settings;
+	BindingsUI		bindings;
 	int				W = 0, H = 0, headerH = 0, tabsH = 0, footH = 0;
 	RECT			pageRect = {};
 };
@@ -612,7 +614,8 @@ static void ShowPage(LauncherUI& L, int page)
 {
 	L.page = page;
 	ShowSettingsPanel(L.settings, page == PAGE_SETTINGS);
-	ShowWindow(L.resetBtn, page == PAGE_SETTINGS ? SW_SHOW : SW_HIDE);
+	ShowBindingsPanel(L.bindings, page == PAGE_BUTTONS);
+	ShowWindow(L.resetBtn, (page == PAGE_SETTINGS || page == PAGE_BUTTONS) ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.about, page == PAGE_ABOUT ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.openShogo, page == PAGE_PLAY ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.openFolder, page == PAGE_PLAY ? SW_SHOW : SW_HIDE);
@@ -686,7 +689,7 @@ static void PaintLauncher(HWND hwnd, HDC dc)
 	// Footer.
 	RECT line = { 0, rc.bottom - L.footH, rc.right, rc.bottom - L.footH + 1 };
 	FillRectColor(dc, line, RGB(220, 220, 224));
-	if (L.page == PAGE_SETTINGS) return;		// "Reset to defaults" lives there
+	if (L.page == PAGE_SETTINGS || L.page == PAGE_BUTTONS) return;		// "Reset to defaults" lives there
 	RECT foot = { S(20), rc.bottom - L.footH, rc.right / 2, rc.bottom };
 	SelectObject(dc, L.small);
 	SetTextColor(dc, kMuted);
@@ -740,11 +743,15 @@ static LRESULT CALLBACK LauncherProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	}
 	case WM_COMMAND:
 		if (SettingsHandleCommand(L.settings, wp)) return 0;
+		if (BindingsHandleCommand(L.bindings, wp)) return 0;
 		switch (LOWORD(wp))
 		{
 		case IDC_PLAY:			if (L.ok) { L.play = true; DestroyWindow(hwnd); } return 0;
 		case IDC_CLOSE:			DestroyWindow(hwnd); return 0;
-		case IDC_RESET:			ResetDefaults(L.settings); return 0;
+		case IDC_RESET:
+			if (L.page == PAGE_BUTTONS) ResetBindings(L.bindings);
+			else ResetDefaults(L.settings);
+			return 0;
 		case IDC_OPEN_SHOGO:
 		{
 			std::wstring exe = JoinPath(L.gameDir, L"Shogo.exe");
@@ -831,8 +838,8 @@ static bool RunLauncherWindow(const std::wstring& exeDir, int startPage)
 	};
 
 	L.tabs = make(WC_TABCONTROLW, L"", WS_CLIPSIBLINGS, S(16), L.headerH + S(6), L.W - S(32), L.tabsH, IDC_TABS, L.font);
-	const wchar_t* names[] = { L"  Play  ", L"  VR Settings  ", L"  About && Legal  " };
-	for (int i = 0; i < 3; ++i)
+	const wchar_t* names[] = { L"  Play  ", L"  VR Settings  ", L"  Controller Buttons  ", L"  About && Legal  " };
+	for (int i = 0; i < 4; ++i)
 	{
 		TCITEMW it = {};
 		it.mask = TCIF_TEXT;
@@ -853,6 +860,7 @@ static bool RunLauncherWindow(const std::wstring& exeDir, int startPage)
 	L.openFolder = make(L"BUTTON", L"Open the ShogoVR folder", BS_OWNERDRAW | WS_TABSTOP, L.W - S(24) - S(220), pby - S(8), S(220), S(32), IDC_OPEN_FOLDER, L.font);
 
 	CreateSettingsPanel(L.settings, hwnd, L.font, L.head, S(24), L.pageRect.top + S(8), L.W - S(48), L.modDir);
+	CreateBindingsPanel(L.bindings, hwnd, L.font, L.head, S(24), L.pageRect.top + S(12), L.W - S(48), L.modDir);
 	L.resetBtn = make(L"BUTTON", L"Reset to defaults", BS_OWNERDRAW | WS_TABSTOP, S(20), by, S(160), S(36), IDC_RESET, L.font);
 
 	L.about = make(L"EDIT", gui::AttributionText(L.authors).c_str(),

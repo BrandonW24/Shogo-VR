@@ -137,6 +137,7 @@ static void CheckQuitEvent()
 	X(xrRequestExitSession) X(xrWaitFrame) X(xrBeginFrame) X(xrEndFrame) X(xrLocateViews) \
 	X(xrLocateSpace) X(xrStringToPath) X(xrCreateActionSet) X(xrDestroyActionSet) X(xrCreateAction) \
 	X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) \
+	X(xrGetCurrentInteractionProfile) X(xrPathToString) \
 	X(xrGetActionStateBoolean) X(xrGetActionStateVector2f) X(xrCreateActionSpace)
 
 #define SHOGOVR_DECLARE_FN(name) static PFN_##name name = nullptr;
@@ -1165,17 +1166,104 @@ private:
 };
 
 // Controller actions (see SetupActions)
-enum { A_MOVE, A_TURN, A_FIRE, A_JUMP, A_CROUCH, A_MENU, A_LOG, A_WEAPONS, A_NEXT, A_ALT, A_RECENTER, A_TRANSFORM, A_RAIM, A_LAIM, A_COUNT };
-struct ActionDef { const char* name; XrActionType type; const char* label; };
-struct BindDef { int action; std::string path; };
-struct ProfileLayout { std::string profile; std::vector<BindDef> binds; };
-struct HandLayout
-{
-	XrActionSet	set = XR_NULL_HANDLE;
-	XrAction	act[A_COUNT] = {};
-	XrSpace		gunSpace = XR_NULL_HANDLE;
-	XrSpace		offSpace = XR_NULL_HANDLE;
+// ----------------------------------------------------------------------- //
+//  Controller buttons
+//
+//  The bridge reads physical buttons per hand; what each one does in the
+//  game comes from a binding table per controller type (ShogoVR.ini,
+//  [Bindings.touch] etc. - the launcher's "Controller Buttons" tab).  The
+//  table is relative to the gun hand, so left-handed mode mirrors it.
+//  The sticks are fixed: the other hand's stick moves you, the gun hand's
+//  stick turns (left/right) and changes weapon (up/down).
+// ----------------------------------------------------------------------- //
+
+enum { IN_TRIGGER, IN_GRIP, IN_PRIMARY, IN_SECONDARY, IN_STICKCLICK, IN_MENU, IN_COUNT };
+static const char* k_inputKeys[IN_COUNT] = { "Trigger", "Grip", "Primary", "Secondary", "StickClick", "Menu" };
+
+enum { FN_NONE, FN_FIRE, FN_JUMP, FN_CROUCH, FN_TRANSFORM, FN_NEXT_WEAPON, FN_WEAPON_LIST, FN_MISSION_LOG, FN_MENU, FN_RECENTER, FN_COUNT };
+static const char* k_fnKeys[FN_COUNT] = { "none", "fire", "jump", "crouch", "transform", "next_weapon", "weapon_list", "mission_log", "menu", "recenter" };
+
+enum { CTRL_TOUCH, CTRL_INDEX, CTRL_VIVE, CTRL_WMR, CTRL_SIMPLE, CTRL_COUNT };
+static const char* k_ctrlKeys[CTRL_COUNT] = { "touch", "index", "vive", "wmr", "simple" };
+static const char* k_ctrlNames[CTRL_COUNT] = { "Meta Quest / Rift (Touch)", "Valve Index", "HTC Vive", "Windows Mixed Reality", "basic controller" };
+static const char* k_ctrlProfiles[CTRL_COUNT] = {
+	"/interaction_profiles/oculus/touch_controller", "/interaction_profiles/valve/index_controller",
+	"/interaction_profiles/htc/vive_controller", "/interaction_profiles/microsoft/motion_controller",
+	"/interaction_profiles/khr/simple_controller" };
+
+// Defaults: [controller][0 = gun hand, 1 = other hand][input] - the layout
+// Shogo VR has always had.
+static const int k_defaultBindings[CTRL_COUNT][2][IN_COUNT] = {
+	{ { FN_FIRE, FN_NEXT_WEAPON, FN_JUMP, FN_CROUCH, FN_NONE, FN_MENU },					// Touch
+	  { FN_NONE, FN_WEAPON_LIST, FN_MISSION_LOG, FN_WEAPON_LIST, FN_RECENTER, FN_MENU } },
+	{ { FN_FIRE, FN_NEXT_WEAPON, FN_JUMP, FN_CROUCH, FN_NONE, FN_NONE },					// Index
+	  { FN_NONE, FN_WEAPON_LIST, FN_MISSION_LOG, FN_MENU, FN_RECENTER, FN_NONE } },
+	{ { FN_FIRE, FN_JUMP, FN_NONE, FN_NONE, FN_NONE, FN_NEXT_WEAPON },						// Vive
+	  { FN_NONE, FN_CROUCH, FN_NONE, FN_NONE, FN_RECENTER, FN_MENU } },
+	{ { FN_FIRE, FN_CROUCH, FN_JUMP, FN_NONE, FN_NONE, FN_NEXT_WEAPON },					// Windows MR
+	  { FN_NONE, FN_WEAPON_LIST, FN_MISSION_LOG, FN_NONE, FN_RECENTER, FN_MENU } },
+	{ { FN_FIRE, FN_NONE, FN_NONE, FN_NONE, FN_NONE, FN_MENU },								// basic
+	  { FN_JUMP, FN_NONE, FN_NONE, FN_NONE, FN_NONE, FN_MENU } },
 };
+
+// Where each input is on each controller ("" = it doesn't have one).
+static const char* InputPath(int ctrl, int input, bool left)
+{
+	switch (ctrl)
+	{
+	case CTRL_TOUCH:
+	{
+		static const char* L[IN_COUNT] = { "trigger/value", "squeeze/value", "x/click", "y/click", "thumbstick/click", "menu/click" };
+		static const char* R[IN_COUNT] = { "trigger/value", "squeeze/value", "a/click", "b/click", "thumbstick/click", "" };
+		return left ? L[input] : R[input];
+	}
+	case CTRL_INDEX:
+	{
+		static const char* B[IN_COUNT] = { "trigger/value", "squeeze/value", "a/click", "b/click", "thumbstick/click", "" };
+		return B[input];
+	}
+	case CTRL_VIVE:
+	{
+		static const char* B[IN_COUNT] = { "trigger/value", "squeeze/click", "", "", "trackpad/click", "menu/click" };
+		return B[input];
+	}
+	case CTRL_WMR:
+	{
+		static const char* B[IN_COUNT] = { "trigger/value", "squeeze/click", "trackpad/click", "", "thumbstick/click", "menu/click" };
+		return B[input];
+	}
+	default:
+	{
+		static const char* B[IN_COUNT] = { "select/click", "", "", "", "", "menu/click" };
+		return B[input];
+	}
+	}
+}
+
+static const char* StickPath(int ctrl)
+{
+	return ctrl == CTRL_VIVE ? "trackpad" : (ctrl == CTRL_SIMPLE ? "" : "thumbstick");
+}
+
+// Pressed inputs -> game buttons (SHOGOVR_BTN_*), using one controller's
+// table.  pressed[0] = gun hand, [1] = other hand.
+static DWORD ApplyBindings(const int map[2][IN_COUNT], const bool pressed[2][IN_COUNT], bool& recenter)
+{
+	static const DWORD k_fnButton[FN_COUNT] = { 0, SHOGOVR_BTN_FIRE, SHOGOVR_BTN_JUMP, SHOGOVR_BTN_CROUCH, SHOGOVR_BTN_TRANSFORM,
+		SHOGOVR_BTN_NEXT_WEAPON, SHOGOVR_BTN_WEAPONS, SHOGOVR_BTN_LOG, SHOGOVR_BTN_MENU, 0 };
+	DWORD buttons = 0;
+	recenter = false;
+	for (int h = 0; h < 2; ++h)
+		for (int i = 0; i < IN_COUNT; ++i)
+			if (pressed[h][i])
+			{
+				int fn = map[h][i];
+				if (fn <= FN_NONE || fn >= FN_COUNT) continue;
+				if (fn == FN_RECENTER) recenter = true;
+				else buttons |= k_fnButton[fn];
+			}
+	return buttons;
+}
 
 struct EyeSwapchain
 {
@@ -1277,7 +1365,17 @@ private:
 	XrPosef			m_screenPose = IdentityPose();
 
 	// Controllers
-	HandLayout		m_hands[2];					// [0] right-handed, [1] left-handed layout
+	XrActionSet		m_actionSet = XR_NULL_HANDLE;
+	XrAction		m_actInput[IN_COUNT] = {};	// physical buttons, per hand (subaction paths)
+	XrAction		m_actStick = XR_NULL_HANDLE;
+	XrAction		m_actAim = XR_NULL_HANDLE;
+	XrSpace			m_aimSpace[2] = {};			// [0] left hand, [1] right hand
+	XrPath			m_handPath[2] = {};
+	int				m_ctrl = CTRL_TOUCH;		// controller type in use
+	bool			m_ctrlReported = false;
+	int				m_bindings[CTRL_COUNT][2][IN_COUNT];
+	void			LoadBindings(const wchar_t* ini);
+	void			UpdateControllerType();
 	bool			m_actionsReady = false;
 	bool			m_leftHanded = false;
 	bool			m_directCapture = true;		// take frames straight from the game's renderer when it offers them
@@ -1493,174 +1591,150 @@ static XrAction MakeAction(XrActionSet set, XrActionType type, const char* name,
 	return a;
 }
 
-static const ActionDef k_actions[A_COUNT] =
-{
-	{ "move",			XR_ACTION_TYPE_VECTOR2F_INPUT,	"Move / strafe" },
-	{ "turn",			XR_ACTION_TYPE_VECTOR2F_INPUT,	"Turn (left/right), change weapon (up/down)" },
-	{ "fire",			XR_ACTION_TYPE_BOOLEAN_INPUT,	"Fire" },
-	{ "jump",			XR_ACTION_TYPE_BOOLEAN_INPUT,	"Jump / menu select" },
-	{ "crouch",			XR_ACTION_TYPE_BOOLEAN_INPUT,	"Crouch / menu back" },
-	{ "menu",			XR_ACTION_TYPE_BOOLEAN_INPUT,	"Menu" },
-	{ "mission_log",	XR_ACTION_TYPE_BOOLEAN_INPUT,	"Mission log" },
-	{ "weapon_list",	XR_ACTION_TYPE_BOOLEAN_INPUT,	"Weapon list" },
-	{ "next_weapon",	XR_ACTION_TYPE_BOOLEAN_INPUT,	"Next weapon" },
-	{ "alt",			XR_ACTION_TYPE_BOOLEAN_INPUT,	"Spare button" },
-	{ "recenter",		XR_ACTION_TYPE_BOOLEAN_INPUT,	"Recentre view" },
-	{ "transform",		XR_ACTION_TYPE_BOOLEAN_INPUT,	"Transform (mech vehicle mode)" },
-	{ "gun_hand",		XR_ACTION_TYPE_POSE_INPUT,		"Gun hand (aim)" },
-	{ "off_hand",		XR_ACTION_TYPE_POSE_INPUT,		"Other hand" },
-};
-
-static const char* k_touch = "/interaction_profiles/oculus/touch_controller";
-
-// The right-handed layouts.  The left-handed ones are made from these by
-// MirrorPath().
-static std::vector<ProfileLayout> RightHandedLayouts()
-{
-	const char* L = "/user/hand/left/input/";
-	const char* R = "/user/hand/right/input/";
-	auto P = [](const char* hand, const char* comp) { return std::string(hand) + comp; };
-	std::vector<ProfileLayout> out;
-
-	// Meta Quest / Rift (Touch)
-	out.push_back({ k_touch, {
-		{ A_MOVE, P(L, "thumbstick") }, { A_TURN, P(R, "thumbstick") }, { A_FIRE, P(R, "trigger/value") },
-		{ A_JUMP, P(R, "a/click") }, { A_CROUCH, P(R, "b/click") }, { A_MENU, P(L, "menu/click") },
-		{ A_LOG, P(L, "x/click") }, { A_WEAPONS, P(L, "y/click") }, { A_WEAPONS, P(L, "squeeze/value") },
-		{ A_NEXT, P(R, "squeeze/value") },
-		{ A_ALT, P(L, "trigger/value") }, { A_RECENTER, P(L, "thumbstick/click") },
-		{ A_RAIM, P(R, "aim/pose") }, { A_LAIM, P(L, "aim/pose") } } });
-
-	// Valve Index
-	out.push_back({ "/interaction_profiles/valve/index_controller", {
-		{ A_MOVE, P(L, "thumbstick") }, { A_TURN, P(R, "thumbstick") }, { A_FIRE, P(R, "trigger/value") },
-		{ A_JUMP, P(R, "a/click") }, { A_CROUCH, P(R, "b/click") }, { A_MENU, P(L, "b/click") },
-		{ A_LOG, P(L, "a/click") }, { A_WEAPONS, P(L, "squeeze/value") }, { A_NEXT, P(R, "squeeze/value") },
-		{ A_ALT, P(L, "trigger/value") }, { A_RECENTER, P(L, "thumbstick/click") },
-		{ A_RAIM, P(R, "aim/pose") }, { A_LAIM, P(L, "aim/pose") } } });
-
-	// HTC Vive wands (trackpads instead of sticks)
-	out.push_back({ "/interaction_profiles/htc/vive_controller", {
-		{ A_MOVE, P(L, "trackpad") }, { A_TURN, P(R, "trackpad") }, { A_FIRE, P(R, "trigger/value") },
-		{ A_JUMP, P(R, "squeeze/click") }, { A_CROUCH, P(L, "squeeze/click") }, { A_MENU, P(L, "menu/click") },
-		{ A_NEXT, P(R, "menu/click") }, { A_ALT, P(L, "trigger/value") }, { A_RECENTER, P(L, "trackpad/click") },
-		{ A_RAIM, P(R, "aim/pose") }, { A_LAIM, P(L, "aim/pose") } } });
-
-	// Windows Mixed Reality
-	out.push_back({ "/interaction_profiles/microsoft/motion_controller", {
-		{ A_MOVE, P(L, "thumbstick") }, { A_TURN, P(R, "thumbstick") }, { A_FIRE, P(R, "trigger/value") },
-		{ A_JUMP, P(R, "trackpad/click") }, { A_CROUCH, P(R, "squeeze/click") }, { A_MENU, P(L, "menu/click") },
-		{ A_LOG, P(L, "trackpad/click") }, { A_WEAPONS, P(L, "squeeze/click") }, { A_NEXT, P(R, "menu/click") },
-		{ A_ALT, P(L, "trigger/value") }, { A_RECENTER, P(L, "thumbstick/click") },
-		{ A_RAIM, P(R, "aim/pose") }, { A_LAIM, P(L, "aim/pose") } } });
-
-	// Anything else (basic fallback)
-	out.push_back({ "/interaction_profiles/khr/simple_controller", {
-		{ A_FIRE, P(R, "select/click") }, { A_JUMP, P(L, "select/click") }, { A_MENU, P(L, "menu/click") },
-		{ A_RAIM, P(R, "aim/pose") }, { A_LAIM, P(L, "aim/pose") } } });
-	return out;
-}
-
-// Left-handed version of a binding: swap the hands.  On Touch controllers the
-// buttons differ per hand (A/B right, X/Y left), and only the left one has a
-// menu button, so the menu stays where it is.
-static std::string MirrorPath(const std::string& profile, const std::string& path)
-{
-	const std::string L = "/user/hand/left/", R = "/user/hand/right/";
-	bool bWasLeft  = path.compare(0, L.size(), L) == 0;
-	bool bWasRight = path.compare(0, R.size(), R) == 0;
-	bool bTouch = (profile == k_touch);
-	if (bTouch && path == L + "input/menu/click") return path;
-
-	std::string p = path;
-	if (bWasLeft)		p = R + path.substr(L.size());
-	else if (bWasRight)	p = L + path.substr(R.size());
-
-	if (bTouch)
-	{
-		auto swapComp = [&](const char* from, const char* to)
-		{
-			std::string f = std::string("/input/") + from + "/";
-			size_t pos = p.find(f);
-			if (pos != std::string::npos) p.replace(pos, f.size(), std::string("/input/") + to + "/");
-		};
-		if (bWasLeft)  { swapComp("x", "a"); swapComp("y", "b"); }	// now on the right hand
-		if (bWasRight) { swapComp("a", "x"); swapComp("b", "y"); }	// now on the left hand
-	}
-	return p;
-}
-
 bool Bridge::SetupActions()
 {
-	// Two action sets: [0] right-handed, [1] left-handed (mirrored).  Both are
-	// attached; each frame we read the one that matches LeftHanded.
-	static const char* k_setNames[2]  = { "gameplay_right", "gameplay_left" };
-	static const char* k_setLabels[2] = { "Shogo (right-handed)", "Shogo (left-handed)" };
-	for (int h = 0; h < 2; ++h)
-	{
-		XrActionSetCreateInfo si = { XR_TYPE_ACTION_SET_CREATE_INFO };
-		strcpy_s(si.actionSetName, k_setNames[h]);
-		strcpy_s(si.localizedActionSetName, k_setLabels[h]);
-		if (!XrOk(xrCreateActionSet(g_instance, &si, &m_hands[h].set), "xrCreateActionSet")) return false;
-		for (int a = 0; a < A_COUNT; ++a)
-			m_hands[h].act[a] = MakeAction(m_hands[h].set, k_actions[a].type, k_actions[a].name, k_actions[a].label);
-	}
+	m_handPath[0] = MakePath("/user/hand/left");
+	m_handPath[1] = MakePath("/user/hand/right");
 
-	// One suggestion per controller type, carrying both layouts (a second
-	// call for the same type would replace the first).
-	for (const ProfileLayout& layout : RightHandedLayouts())
+	XrActionSetCreateInfo si = { XR_TYPE_ACTION_SET_CREATE_INFO };
+	strcpy_s(si.actionSetName, "shogo");
+	strcpy_s(si.localizedActionSetName, "Shogo VR");
+	if (!XrOk(xrCreateActionSet(g_instance, &si, &m_actionSet), "xrCreateActionSet")) return false;
+
+	// Every action works per hand.
+	auto make = [&](XrActionType type, const char* name, const char* label) -> XrAction
 	{
-		std::vector<std::string> paths;		// keep the strings alive while building
+		XrActionCreateInfo ci = { XR_TYPE_ACTION_CREATE_INFO };
+		ci.actionType = type;
+		strcpy_s(ci.actionName, name);
+		strcpy_s(ci.localizedActionName, label);
+		ci.countSubactionPaths = 2;
+		ci.subactionPaths = m_handPath;
+		XrAction a = XR_NULL_HANDLE;
+		XrOk(xrCreateAction(m_actionSet, &ci, &a), name);
+		return a;
+	};
+	static const char* k_names[IN_COUNT]  = { "trigger", "grip", "primary", "secondary", "stick_click", "menu" };
+	static const char* k_labels[IN_COUNT] = { "Trigger", "Grip", "A/X button", "B/Y button", "Stick click", "Menu button" };
+	for (int i = 0; i < IN_COUNT; ++i) m_actInput[i] = make(XR_ACTION_TYPE_BOOLEAN_INPUT, k_names[i], k_labels[i]);
+	m_actStick = make(XR_ACTION_TYPE_VECTOR2F_INPUT, "stick", "Stick (move / turn)");
+	m_actAim = make(XR_ACTION_TYPE_POSE_INPUT, "aim", "Hand (aim)");
+
+	// Every physical input of every supported controller.
+	for (int c = 0; c < CTRL_COUNT; ++c)
+	{
 		std::vector<XrActionSuggestedBinding> sb;
-		for (const BindDef& b : layout.binds)
+		for (int hand = 0; hand < 2; ++hand)
 		{
-			sb.push_back({ m_hands[0].act[b.action], MakePath(b.path.c_str()) });
-			sb.push_back({ m_hands[1].act[b.action], MakePath(MirrorPath(layout.profile, b.path).c_str()) });
+			std::string base = hand == 0 ? "/user/hand/left/input/" : "/user/hand/right/input/";
+			for (int i = 0; i < IN_COUNT; ++i)
+			{
+				const char* path = InputPath(c, i, hand == 0);
+				if (path[0]) sb.push_back({ m_actInput[i], MakePath((base + path).c_str()) });
+			}
+			if (StickPath(c)[0]) sb.push_back({ m_actStick, MakePath((base + StickPath(c)).c_str()) });
+			sb.push_back({ m_actAim, MakePath((base + "aim/pose").c_str()) });
 		}
 		XrInteractionProfileSuggestedBinding ps = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
-		ps.interactionProfile = MakePath(layout.profile.c_str());
+		ps.interactionProfile = MakePath(k_ctrlProfiles[c]);
 		ps.countSuggestedBindings = (uint32_t)sb.size();
 		ps.suggestedBindings = sb.data();
 		XrResult r = xrSuggestInteractionProfileBindings(g_instance, &ps);
-		if (XR_FAILED(r)) printf("(Couldn't set up bindings for %s - error %d)\n", layout.profile.c_str(), (int)r);
+		if (XR_FAILED(r)) printf("(Couldn't set up bindings for %s - error %d)\n", k_ctrlProfiles[c], (int)r);
 	}
 
-	for (int h = 0; h < 2; ++h)
+	for (int hand = 0; hand < 2; ++hand)
 	{
 		XrActionSpaceCreateInfo asi = { XR_TYPE_ACTION_SPACE_CREATE_INFO };
 		asi.poseInActionSpace = IdentityPose();
-		asi.action = m_hands[h].act[A_RAIM];
-		if (!XrOk(xrCreateActionSpace(m_session, &asi, &m_hands[h].gunSpace), "xrCreateActionSpace(gun hand)")) return false;
-		asi.action = m_hands[h].act[A_LAIM];
-		if (!XrOk(xrCreateActionSpace(m_session, &asi, &m_hands[h].offSpace), "xrCreateActionSpace(other hand)")) return false;
+		asi.action = m_actAim;
+		asi.subactionPath = m_handPath[hand];
+		if (!XrOk(xrCreateActionSpace(m_session, &asi, &m_aimSpace[hand]), "xrCreateActionSpace(hand)")) return false;
 	}
 
-	XrActionSet sets[2] = { m_hands[0].set, m_hands[1].set };
 	XrSessionActionSetsAttachInfo ai = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
-	ai.countActionSets = 2;
-	ai.actionSets = sets;
+	ai.countActionSets = 1;
+	ai.actionSets = &m_actionSet;
 	if (!XrOk(xrAttachSessionActionSets(m_session, &ai), "xrAttachSessionActionSets")) return false;
 
 	m_actionsReady = true;
 	return true;
 }
 
-static bool GetBool(XrSession session, XrAction a)
+// Which controllers are in use - picks the binding table, and tells the
+// launcher (ShogoVR.ini [Controls] Controller) which one to show.
+void Bridge::UpdateControllerType()
+{
+	if (!m_actionsReady) return;
+	for (int hand = 1; hand >= 0; --hand)
+	{
+		XrInteractionProfileState st = { XR_TYPE_INTERACTION_PROFILE_STATE };
+		if (XR_FAILED(xrGetCurrentInteractionProfile(m_session, m_handPath[hand], &st)) || st.interactionProfile == XR_NULL_PATH) continue;
+		char name[XR_MAX_PATH_LENGTH] = "";
+		uint32_t len = 0;
+		if (XR_FAILED(xrPathToString(g_instance, st.interactionProfile, XR_MAX_PATH_LENGTH, &len, name))) continue;
+		for (int c = 0; c < CTRL_COUNT; ++c)
+		{
+			if (strcmp(name, k_ctrlProfiles[c]) != 0) continue;
+			if (c != m_ctrl || !m_ctrlReported)
+			{
+				m_ctrl = c;
+				m_ctrlReported = true;
+				printf("\nControllers: %s.\n", k_ctrlNames[c]);
+				wchar_t key[16];
+				swprintf(key, 16, L"%hs", k_ctrlKeys[c]);
+				WritePrivateProfileStringW(L"Controls", L"Controller", key, m_iniPath.c_str());
+				WIN32_FILE_ATTRIBUTE_DATA fa;
+				if (GetFileAttributesExW(m_iniPath.c_str(), GetFileExInfoStandard, &fa)) m_iniTime = fa.ftLastWriteTime;
+			}
+			return;
+		}
+	}
+}
+
+// [Bindings.touch] GunTrigger=fire ... (missing keys keep the defaults).
+void Bridge::LoadBindings(const wchar_t* ini)
+{
+	memcpy(m_bindings, k_defaultBindings, sizeof(m_bindings));
+	for (int c = 0; c < CTRL_COUNT; ++c)
+	{
+		wchar_t section[32];
+		swprintf(section, 32, L"Bindings.%hs", k_ctrlKeys[c]);
+		for (int h = 0; h < 2; ++h)
+			for (int i = 0; i < IN_COUNT; ++i)
+			{
+				wchar_t key[32], val[32];
+				swprintf(key, 32, L"%ls%hs", h == 0 ? L"Gun" : L"Off", k_inputKeys[i]);
+				GetPrivateProfileStringW(section, key, L"", val, 32, ini);
+				if (!val[0]) continue;
+				for (int f = 0; f < FN_COUNT; ++f)
+				{
+					wchar_t fk[32];
+					swprintf(fk, 32, L"%hs", k_fnKeys[f]);
+					if (_wcsicmp(val, fk) == 0) { m_bindings[c][h][i] = f; break; }
+				}
+			}
+	}
+}
+
+static bool GetBool(XrSession session, XrAction a, XrPath hand = XR_NULL_PATH)
 {
 	if (a == XR_NULL_HANDLE) return false;
 	XrActionStateGetInfo gi = { XR_TYPE_ACTION_STATE_GET_INFO };
 	gi.action = a;
+	gi.subactionPath = hand;
 	XrActionStateBoolean st = { XR_TYPE_ACTION_STATE_BOOLEAN };
 	if (XR_FAILED(xrGetActionStateBoolean(session, &gi, &st))) return false;
 	return st.isActive && st.currentState;
 }
 
-static XrVector2f GetVec2(XrSession session, XrAction a)
+static XrVector2f GetVec2(XrSession session, XrAction a, XrPath hand = XR_NULL_PATH)
 {
 	XrVector2f v = { 0.0f, 0.0f };
 	if (a == XR_NULL_HANDLE) return v;
 	XrActionStateGetInfo gi = { XR_TYPE_ACTION_STATE_GET_INFO };
 	gi.action = a;
+	gi.subactionPath = hand;
 	XrActionStateVector2f st = { XR_TYPE_ACTION_STATE_VECTOR2F };
 	if (XR_SUCCEEDED(xrGetActionStateVector2f(session, &gi, &st)) && st.isActive) v = st.currentState;
 	return v;
@@ -1685,17 +1759,17 @@ void Bridge::PollInput(XrTime time, BridgeData& d)
 	m_motion = 0.0f;
 	if (!m_actionsReady || m_state != XR_SESSION_STATE_FOCUSED) return;
 
-	const HandLayout& H = m_hands[m_leftHanded ? 1 : 0];
-	XrActiveActionSet active = { H.set, XR_NULL_PATH };
+	XrActiveActionSet active = { m_actionSet, XR_NULL_PATH };
 	XrActionsSyncInfo sync = { XR_TYPE_ACTIONS_SYNC_INFO };
 	sync.countActiveActionSets = 1;
 	sync.activeActionSets = &active;
 	if (xrSyncActions(m_session, &sync) != XR_SUCCESS) return;	// not focused etc.
 
 	d.ctrlFlags |= SHOGOVR_CTRL_ACTIVE;
+	int gun = m_leftHanded ? 0 : 1, off = 1 - gun;			// indices into m_handPath / m_aimSpace
 
-	XrVector2f mv = GetVec2(m_session, H.act[A_MOVE]);
-	XrVector2f tv = GetVec2(m_session, H.act[A_TURN]);
+	XrVector2f mv = GetVec2(m_session, m_actStick, m_handPath[off]);
+	XrVector2f tv = GetVec2(m_session, m_actStick, m_handPath[gun]);
 	d.moveX = mv.x;	d.moveY = mv.y;
 	d.turnX = tv.x;	d.turnY = tv.y;
 
@@ -1704,27 +1778,28 @@ void Bridge::PollInput(XrTime time, BridgeData& d)
 	float turnAmt = std::fabs(tv.x) > std::fabs(tv.y) ? std::fabs(tv.x) : 0.0f;
 	m_motion = std::min(1.0f, std::max(moveAmt > 0.15f ? moveAmt : 0.0f, turnAmt > 0.2f ? turnAmt : 0.0f));
 
-	static const int k_btn[][2] = {
-		{ A_FIRE, SHOGOVR_BTN_FIRE }, { A_JUMP, SHOGOVR_BTN_JUMP }, { A_CROUCH, SHOGOVR_BTN_CROUCH },
-		{ A_MENU, SHOGOVR_BTN_MENU }, { A_LOG, SHOGOVR_BTN_LOG }, { A_WEAPONS, SHOGOVR_BTN_WEAPONS },
-		{ A_NEXT, SHOGOVR_BTN_NEXT_WEAPON }, { A_ALT, SHOGOVR_BTN_ALT }, { A_TRANSFORM, SHOGOVR_BTN_TRANSFORM } };
-	for (auto& b : k_btn) if (GetBool(m_session, H.act[b[0]])) d.buttons |= b[1];
-
-	// Recentre: click the movement stick (handled here, the game doesn't need it).
-	bool rc = GetBool(m_session, H.act[A_RECENTER]);
+	// Buttons, through the binding table for these controllers.
+	bool pressed[2][IN_COUNT];
+	for (int i = 0; i < IN_COUNT; ++i)
+	{
+		pressed[0][i] = GetBool(m_session, m_actInput[i], m_handPath[gun]);
+		pressed[1][i] = GetBool(m_session, m_actInput[i], m_handPath[off]);
+	}
+	bool rc = false;
+	d.buttons |= ApplyBindings(m_bindings[m_ctrl], pressed, rc);
 	if (rc && !m_recenterBtnDown) Recenter();
 	m_recenterBtnDown = rc;
 
 	// Hands: the game's "right" hand is always the gun hand.
 	const XrSpaceLocationFlags need = XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_VALID_BIT;
 	XrSpaceLocation loc = { XR_TYPE_SPACE_LOCATION };
-	if (XR_SUCCEEDED(xrLocateSpace(H.gunSpace, m_localSpace, time, &loc)) && (loc.locationFlags & need) == need)
+	if (XR_SUCCEEDED(xrLocateSpace(m_aimSpace[gun], m_localSpace, time, &loc)) && (loc.locationFlags & need) == need)
 	{
 		ToGameSpace(loc.pose, d.rFwd, d.rUp, d.rPos);
 		d.ctrlFlags |= SHOGOVR_CTRL_RIGHT_POSE;
 	}
 	loc = { XR_TYPE_SPACE_LOCATION };
-	if (XR_SUCCEEDED(xrLocateSpace(H.offSpace, m_localSpace, time, &loc)) && (loc.locationFlags & need) == need)
+	if (XR_SUCCEEDED(xrLocateSpace(m_aimSpace[off], m_localSpace, time, &loc)) && (loc.locationFlags & need) == need)
 	{
 		ToGameSpace(loc.pose, d.lFwd, d.lUp, d.lPos);
 		d.ctrlFlags |= SHOGOVR_CTRL_LEFT_POSE;
@@ -2454,7 +2529,11 @@ void Bridge::PollEvents()
 	XrEventDataBuffer ev = { XR_TYPE_EVENT_DATA_BUFFER };
 	while (xrPollEvent(g_instance, &ev) == XR_SUCCESS)
 	{
-		if (ev.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED)
+		if (ev.type == XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED)
+		{
+			UpdateControllerType();
+		}
+		else if (ev.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED)
 		{
 			const XrEventDataSessionStateChanged& sc = *(XrEventDataSessionStateChanged*)&ev;
 			m_state = sc.state;
@@ -2634,6 +2713,7 @@ void Bridge::LoadSettings(bool bFirst)
 	bool leftHanded = GetPrivateProfileIntW(L"Controls", L"LeftHanded", 0, ini) != 0;
 	GetPrivateProfileStringW(L"Comfort", L"Vignette", L"0", buf, 64, ini);
 	float vignette = std::max(0.0f, std::min(1.0f, (float)_wtof(buf)));
+	LoadBindings(ini);
 	bool direct = GetPrivateProfileIntW(L"Picture", L"DirectCapture", 1, ini) != 0;
 	bool spectator = GetPrivateProfileIntW(L"Picture", L"Spectator", 0, ini) != 0;
 
@@ -2929,12 +3009,8 @@ void Bridge::Shutdown()
 	m_link.Close();
 	DestroySwapchains();
 	m_spectator.Close();
-	for (auto& h : m_hands)
-	{
-		if (h.gunSpace != XR_NULL_HANDLE) xrDestroySpace(h.gunSpace);
-		if (h.offSpace != XR_NULL_HANDLE) xrDestroySpace(h.offSpace);
-		if (h.set != XR_NULL_HANDLE) xrDestroyActionSet(h.set);
-	}
+	for (XrSpace& sp : m_aimSpace) if (sp != XR_NULL_HANDLE) { xrDestroySpace(sp); sp = XR_NULL_HANDLE; }
+	if (m_actionSet != XR_NULL_HANDLE) xrDestroyActionSet(m_actionSet);
 	if (m_viewSpace != XR_NULL_HANDLE) xrDestroySpace(m_viewSpace);
 	if (m_localSpace != XR_NULL_HANDLE) xrDestroySpace(m_localSpace);
 	if (m_session != XR_NULL_HANDLE) xrDestroySession(m_session);

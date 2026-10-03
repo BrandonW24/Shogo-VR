@@ -125,8 +125,8 @@ An additional note, when ShogoVR crashes, there might be a left over ShogoVRBrid
 * Virtual Desktop displays the game entirely upside down
 * Launcher error `0xC0000005` is related to the launcher crashing
 * Vignetting does not seem to work properly
-* With Quest 3 & Quest 2 controllers there seems to be no way to bring up the in-game menu....
-  * **TODO: Make buttons rebindable & accessible from the launcher**
+* ~~With Quest 3 & Quest 2 controllers there seems to be no way to bring up the in-game menu....~~
+  * ~~**TODO: Make buttons rebindable & accessible from the launcher**~~
 
 
 ## What's in this repository

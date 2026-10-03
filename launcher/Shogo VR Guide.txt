@@ -82,7 +82,8 @@ CONTROLS (Quest / Rift layout - Index, Vive and WMR are similar)
   keyboard.
   Left-handed mode (in Settings) mirrors all of this: left hand aims and
   fires, right stick moves.
-  You can remap buttons in SteamVR's controller binding settings.
+  Every button can be rebound in the launcher's Controller Buttons tab
+  (changes apply straight away, even mid-game).
 
 BEST PICTURE
 - Shogo VR takes the picture straight from the game's renderer (when the
