@@ -99,6 +99,7 @@ Your new `ShogoVR` folder holds three logs, each rewritten every run. Please att
 * Crouch in pilot/Sanjuro seems to be busted / not bound correctly at the moment
 * Clarity still needs some work
 * Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
+* Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
 
 ## What's in this repository
 
