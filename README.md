@@ -50,7 +50,8 @@ https://youtu.be/d2rjNoYvyQU
 - Your own copy of **Shogo: Mobile Armor Division v2.2** ([Steam](https://store.steampowered.com/) or [GOG](https://www.gog.com/)).
 - A **PC VR** headset with SteamVR, and SteamVR set as the OpenXR runtime (*SteamVR → Settings → OpenXR → Set SteamVR as OpenXR Runtime*).
   - *(At the moment I have currently only tested this with SteamVR + OpenXR)*
-
+  - *If you are playing with a Quest 3 or Quest 2 I heavily recommend playing through via Steamlink, at the moment using **Virtual Desktop** causes the whole game to render **upside down**.*
+  
 - Shogo running in a window. With dgVoodoo 2, set *Appearance* to *Windowed*; the mod takes care of the window's size.
 
 ## Install and play
