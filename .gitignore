@@ -1,0 +1,15 @@
+# Build output
+*.exe
+*.res
+*.obj
+*.o
+*.pdb
+*.ilk
+Debug/
+Release/
+x64/
+.vs/
+# Never commit these
+CShell.dll
+*.patch
+__pycache__/

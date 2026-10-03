@@ -1,0 +1,121 @@
+SHOGO VR  -  play Shogo: Mobile Armor Division in a VR headset
+==============================================================
+An unofficial VR mod, unaffiliated with Monolith Productions or any of its
+affiliates and subsidiaries. Free. Created by the people in AUTHORS.txt.
+
+WHAT YOU NEED
+- Shogo: Mobile Armor Division (Steam or GOG), version 2.2.
+- A PC VR headset with SteamVR, and SteamVR set as the OpenXR runtime:
+  SteamVR > Settings > OpenXR > "Set SteamVR as OpenXR Runtime".
+- Shogo running in a window. With dgVoodoo 2, set its appearance to
+  "Windowed" in dgVoodooCpl. (The VR mod takes care of the window's size.)
+
+SETTINGS
+- In the game: Options > vr settings. Stick up/down picks a setting,
+  left/right changes it. Changes apply immediately.
+- On the desktop: the launcher's VR Settings tab ("Shogo VR Settings" in
+  the Start menu opens it directly). It also applies straight away.
+- Options include left- or right-handed, aim with hand or head, two-handed
+  aiming, which way the stick walks you, snap or smooth turning, comfort
+  vignette, 6DoF, stereo depth, your body, HUD size and distance, menu
+  screen size, gun size, sharpening and more.
+
+THE GUN IN YOUR HAND
+- You hold the detailed first-person gun with Sanjuro's arms, as in the
+  original game. The settings can hide the arms ("gun arms"), or switch to
+  the simpler third-person gun model ("gun model").
+- The parts of each gun model are listed in ShogoVR_models.txt in the
+  ShogoVR folder. If arms still show on some gun, send that file in.
+
+TWO-HANDED AIMING AND YOUR BODY
+- Hold your other hand out in front of the gun hand, along the barrel, and
+  the gun aims from your gun hand towards it - like holding a rifle.
+- Look down to see your body (Sanjuro, or your mech). It walks, runs,
+  crouches and jumps as you move. Its head and arms are hidden: the game
+  engine can't bend a model's arms to follow your controllers, so your
+  hands are the gun in your hand. "VRBodyInfo" in the console lists the
+  model's parts if something that should be hidden isn't.
+
+IF SOMETHING GOES WRONG
+- Logs in the ShogoVR folder record what happened and when:
+  ShogoVR_launch.log (what the Shogo VR shortcut did),
+  ShogoVRBridge.log (window, focus, capture, settings) and
+  ShogoVR_game.log (player mode, transforms, camera FOV, zoom, resolution,
+  renderer resets). Both start fresh each run - send them in with any bug
+  report before playing again.
+
+PLAYING
+- Start "Shogo VR" from your Desktop or Start menu and press Play. It
+  starts the headset bridge and the game, and closes the bridge when you
+  quit Shogo. The launcher's VR Settings tab has all the VR options.
+- Or start Shogo any way you normally do (Shogo.exe, Steam's Play button)
+  with -rez ShogoVR on its command line (Shogo.exe: Advanced). The mod
+  starts the headset bridge by itself and closes it when you quit - no need
+  to start the bridge yourself.
+- If the "Shogo VR" shortcut doesn't start the game on your PC, start Shogo
+  once from its own launcher with -rez ShogoVR: the mod remembers exactly
+  how the game was started, and the shortcut uses that from then on.
+- Put on the headset, look straight ahead and click the left thumbstick
+  (or press Ctrl+Shift+R) to recentre.
+- Keep the Shogo window visible on the desktop while you play.
+
+CONTROLS (Quest / Rift layout - Index, Vive and WMR are similar)
+  Aim .................... right hand        Fire ............... right trigger
+  Move ................... left stick        Turn ............... right stick left/right
+  Change weapon .......... right stick up/down, or right grip
+  Jump ................... A                 Crouch ............. B (hold)
+  Transform (mech) ....... tap B (in a mech, holding B crouches)
+  Menu ................... left menu button  Mission log ........ X (hold)
+  Weapon list ............ Y or left grip     Recentre ........... left stick click
+  Ladders ................ stick forward climbs up, back climbs down
+  In menus: sticks move, A/trigger selects, B goes back.
+  Transforming presses the key bound to "Vehicle mode toggle" in Options >
+  Keyboard for you, so that needs a key. The tractor beam is still on the
+  keyboard.
+  Left-handed mode (in Settings) mirrors all of this: left hand aims and
+  fires, right stick moves.
+  You can remap buttons in SteamVR's controller binding settings.
+
+BEST PICTURE
+- Shogo VR takes the picture straight from the game's renderer (when the
+  game runs through dgVoodoo), so your monitor's resolution no longer
+  limits it: pick a high resolution in Shogo, e.g. 3840x2160 (with NVIDIA
+  DSR enabled, those resolutions appear even if your desktop stays 1080p).
+  The Shogo window may then be bigger than your screen - that's expected.
+- A "left eye" window on the desktop shows what your left eye sees, flat,
+  with the HUD - record that with OBS ("Window Capture"). Ctrl+Shift+M
+  shows/hides it.
+- Shogo VR sets dgVoodoo's emulated video memory to 2 GB (its default
+  256 MB is too little at VR resolutions and makes textures blurrier the
+  longer you play). Up to 4 GB can be chosen in Shogo VR Settings; if the
+  game misbehaves at 3 or 4 GB, go back to 2 GB. Your original
+  dgVoodoo.conf is kept as dgVoodoo.conf.shogovr-backup.
+- Run Shogo at the highest resolution your desktop supports. Each eye gets
+  half of the game window.
+- Even better: run your desktop at 3840x2160 with NVIDIA DSR (NVIDIA Control
+  Panel > Manage 3D settings > DSR - Factors > 4.00x) or AMD Virtual Super
+  Resolution, and choose 3840x2160 in Shogo. At that resolution the HUD is
+  also shown as its own crisp panel.
+- Bridge hotkeys: Ctrl+Shift+S sharpening, Ctrl+Shift+U upscaling,
+  Ctrl+Shift+F fix the game window, Ctrl+Shift+D fix Windows display scaling.
+
+USEFUL CONSOLE SETTINGS (open the console with ~; put + in front to save,
+e.g. "+VRHudWidth 65")
+  VRHudWidth ........ HUD width in degrees (default 60) - spreads it out
+  VRHudDepth ........ HUD distance in metres (default 3.5)
+  VRMenuWidth ....... size of the floating screen for menus (default 80)
+  VRSnapTurn ........ degrees per snap turn, 0 = smooth turning (default 45)
+  VRGunScale ........ size of arms/gun in your hand on foot (default 1.5)
+  VRCalibrate ....... (command) stand on flat ground to set the world scale
+  VRRecenter ........ (command) make your current facing "straight ahead"
+  VRInfo ............ (command) show the current VR state
+
+OPTIONS FOR THE LAUNCHER
+Extra Shogo command-line options can go in ShogoVR.ini (in the
+ShogoVR folder):
+  [Launch]
+  ExtraArgs=+DisableMovies 1
+
+UNINSTALLING
+Windows Settings > Apps > Installed apps > "Shogo VR", or run
+"ShogoVR.exe --uninstall". Shogo itself is never changed.

@@ -1,0 +1,30 @@
+Shogo VR - notices
+==================
+
+Shogo VR is an unofficial VR mod for Shogo: Mobile Armor Division,
+unaffiliated with Monolith Productions or any of its affiliates and
+subsidiaries.
+
+THIS LEVEL IS NOT MADE BY OR SUPPORTED BY Monolith Productions, or any of
+its affiliates and subsidiaries.
+
+Created by: see AUTHORS.txt.
+
+Shogo VR is free; it may not be sold or used commercially in any way. You
+need your own copy of the game; no game files are included, and no game
+executable is modified.
+
+CShell.dll is built from Monolith's Shogo v2.2 source release, whose licence
+allows modifications to be shared free of charge but not the source itself.
+As that licence requires, Monolith Productions has an irrevocable,
+royalty-free right to use and distribute this mod.
+
+Shogo: Mobile Armor Division, its logo and artwork belong to their
+respective owners and are used only to identify the game this mod is for.
+
+ShogoVRBridge.exe includes the Khronos OpenXR headers (Apache License 2.0).
+OpenXR is a trademark of The Khronos Group Inc. The sharpening filter
+follows AMD FidelityFX CAS (MIT licence). dgVoodoo 2 is not included.
+
+In memory of Monolith Productions - thank you for Shogo, and for sharing
+its source with the community.

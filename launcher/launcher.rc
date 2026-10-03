@@ -1,0 +1,4 @@
+1 ICON "assets/shogo.ico"
+1 24 "launcher.manifest"
+101 RCDATA "assets/header.png"
+102 RCDATA "assets/banner.jpg"

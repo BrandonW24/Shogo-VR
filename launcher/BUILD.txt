@@ -1,0 +1,20 @@
+Building the launcher and installer (MinGW-w64, as used for the released binaries):
+
+  windres launcher.rc -O coff -o launcher.res
+  windres setup.rc -O coff -o setup.res
+  g++ -std=c++17 -O2 -static -municode -mwindows ShogoVRLauncher.cpp launcher.res -o ShogoVR.exe -lole32 -luuid -lshell32 -lcomctl32 -ladvapi32 -luser32 -lgdi32 -lwindowscodecs -lmsimg32
+  g++ -std=c++17 -O2 -static -municode -mwindows ShogoVRSetup.cpp setup.res -o SetupStub.exe -lole32 -luuid -lshell32 -lcomdlg32 -lcomctl32 -ladvapi32 -luser32 -lgdi32 -lwindowscodecs -lmsimg32
+
+The .rc files embed the icon (assets/shogo.ico), the artwork (assets/header.png,
+assets/banner.jpg) and the Windows manifests.
+
+The installer builder is SetupStub.exe with these files appended in the payload
+format described in Common.h (PakWrite):
+  ShogoVR/ShogoVRBridge.exe, ShogoVR/ShogoVR.exe, ShogoVR/Shogo VR Guide.txt, ShogoVR/NOTICE.txt
+Running it adds ShogoVR/CShell.dll and ShogoVR/AUTHORS.txt (required) to make
+ShogoVR-Setup.exe.
+
+Command lines (also handy for testing):
+  ShogoVR-InstallerBuilder.exe --build <CShell.dll> [<output.exe>] [--quiet]
+  ShogoVR-Setup.exe [--install <Shogo folder> --quiet]
+  ShogoVR.exe [--play | --settings | --uninstall [--quiet]]
