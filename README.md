@@ -83,6 +83,12 @@ Your new`ShogoVR` folder holds three logs, each rewritten every run. Please atta
 
  The mod remembers that working command line, and the launcher uses it from then on.
 
+## Known Issues
+
+* Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.
+* The game can and will crash at random.
+* VR body simulation is a bit wonky
+
 ## What's in this repository
 
 | Folder | Contents |
