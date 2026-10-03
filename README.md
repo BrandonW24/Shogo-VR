@@ -23,12 +23,25 @@ https://youtu.be/d2rjNoYvyQU
 ## Features
 
 - **True stereo 3D** with 6DoF head tracking, and a world scale calibrated for on foot and in a mech.
+
 - **Motion controllers:** aim with your hand, two-handed aiming, snap or smooth turning, left-handed mode, transforming your mech, and easier ladders. Supports Meta Quest/Rift, Valve Index, HTC Vive and Windows Mixed Reality controllers.
+
 - **A sharp HUD** on its own floating panel, with menus, cutscenes and loading screens on a floating screen.
+
 - **Your body** when you look down, Sanjuro or your mech, animated as you move.
+
 - **Picture quality:** frames go straight from the game's renderer to the headset, so your monitor doesn't limit them. On top of that come sharpening, upscaling and an optional comfort vignette.
+
 - **A left-eye window** on the desktop, for recording and streaming.
-- **A launcher with all the VR settings**, also available in-game under *Options → vr settings*. Changes apply while you play.
+
+- **A launcher with all the VR settings and rebindable button mapping menu** 
+
+  - **Note :** Your VR settings are also available in-game under *Options → vr settings*. Changes apply while you play.
+
+  - Your button rebinding can be done from the launcher in its own tab as seen below : 
+
+    <p align="center"><img src="launcher/assets/rebind_menu.png" alt="Shogo VR" width="640"></p>
+
 
 ## Requirements
 
