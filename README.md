@@ -87,7 +87,8 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 - **Two-handed aiming:** hold your other hand in front of the gun, along the barrel.
 - **Ladders:** stick forward climbs up, back climbs down.
 - **Transforming** presses the key bound to *Vehicle mode toggle* (*Options → Keyboard*), so that action needs a key.
-- **Remapping:** buttons can be changed in SteamVR's controller binding settings.
+- **Remapping:** buttons can be changed in the launcher's own dedicated remapping page as seen below : 
+  <p align="center"><img src="launcher/assets/rebind_menu.png" alt="Shogo VR" width="640"></p>
 
 ## Best picture
 
