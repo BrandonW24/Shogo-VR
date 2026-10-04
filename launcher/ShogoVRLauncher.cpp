@@ -368,6 +368,26 @@ static int Play(const std::wstring& gameDir, const std::wstring& modDir)
 									: L"Couldn't change dgVoodoo's video memory (no permission?)");
 	}
 
+	// Picture quality (Picture tab): dgVoodoo's render resolution, smooth
+	// edges and texture filtering.
+	{
+		int scale = GetPrivateProfileIntW(L"Launch", L"RenderScale", 2, ini.c_str());
+		int msaa = GetPrivateProfileIntW(L"Launch", L"Antialiasing", 2, ini.c_str());
+		int aniso = GetPrivateProfileIntW(L"Launch", L"Anisotropic", 16, ini.c_str());
+		struct { const char* key; std::string value; } opts[] = {
+			{ "Resolution",		scale >= 2 ? std::to_string(scale) + "x" : std::string("unforced") },
+			{ "Antialiasing",	msaa >= 2 ? std::to_string(msaa) + "x" : std::string("appdriven") },
+			{ "Filtering",		aniso >= 2 ? std::to_string(aniso) : std::string("appdriven") },
+		};
+		for (auto& o : opts)
+		{
+			int r = SetDgVoodooDirectX(gameDir, o.key, o.value);
+			std::wstring k(o.key, o.key + strlen(o.key)), v(o.value.begin(), o.value.end());
+			if (r > 0) LaunchLog(L"dgVoodoo " + k + L" = " + v);
+			else if (r < 0) LaunchLog(L"Couldn't change dgVoodoo's " + k + L" (no permission?)");
+		}
+	}
+
 	// 1. The headset bridge: the game starts it itself, so it always has the
 	// game's own rights.  (Windows doesn't let a normal program manage the
 	// window of a game running as administrator - which is how Shogo runs on
@@ -579,7 +599,7 @@ static int Uninstall(const std::wstring& modDir, bool bQuiet)
 // ======================================================================= //
 
 enum { IDC_TABS = 3000, IDC_PLAY, IDC_CLOSE, IDC_OPEN_SHOGO, IDC_OPEN_FOLDER, IDC_ABOUT_TEXT, IDC_RESET };
-enum { PAGE_PLAY = 0, PAGE_SETTINGS, PAGE_BUTTONS, PAGE_ABOUT };
+enum { PAGE_PLAY = 0, PAGE_SETTINGS, PAGE_PICTURE, PAGE_BUTTONS, PAGE_ABOUT };
 
 struct LauncherUI
 {
@@ -592,6 +612,7 @@ struct LauncherUI
 	HWND			tabs = nullptr, playBtn = nullptr, closeBtn = nullptr, openShogo = nullptr, openFolder = nullptr;
 	HWND			about = nullptr, resetBtn = nullptr;
 	SettingsUI		settings;
+	SettingsUI		picture;
 	BindingsUI		bindings;
 	int				W = 0, H = 0, headerH = 0, tabsH = 0, footH = 0;
 	RECT			pageRect = {};
@@ -614,8 +635,9 @@ static void ShowPage(LauncherUI& L, int page)
 {
 	L.page = page;
 	ShowSettingsPanel(L.settings, page == PAGE_SETTINGS);
+	ShowSettingsPanel(L.picture, page == PAGE_PICTURE);
 	ShowBindingsPanel(L.bindings, page == PAGE_BUTTONS);
-	ShowWindow(L.resetBtn, (page == PAGE_SETTINGS || page == PAGE_BUTTONS) ? SW_SHOW : SW_HIDE);
+	ShowWindow(L.resetBtn, (page == PAGE_SETTINGS || page == PAGE_PICTURE || page == PAGE_BUTTONS) ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.about, page == PAGE_ABOUT ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.openShogo, page == PAGE_PLAY ? SW_SHOW : SW_HIDE);
 	ShowWindow(L.openFolder, page == PAGE_PLAY ? SW_SHOW : SW_HIDE);
@@ -689,7 +711,7 @@ static void PaintLauncher(HWND hwnd, HDC dc)
 	// Footer.
 	RECT line = { 0, rc.bottom - L.footH, rc.right, rc.bottom - L.footH + 1 };
 	FillRectColor(dc, line, RGB(220, 220, 224));
-	if (L.page == PAGE_SETTINGS || L.page == PAGE_BUTTONS) return;		// "Reset to defaults" lives there
+	if (L.page == PAGE_SETTINGS || L.page == PAGE_PICTURE || L.page == PAGE_BUTTONS) return;		// "Reset to defaults" lives there
 	RECT foot = { S(20), rc.bottom - L.footH, rc.right / 2, rc.bottom };
 	SelectObject(dc, L.small);
 	SetTextColor(dc, kMuted);
@@ -743,6 +765,7 @@ static LRESULT CALLBACK LauncherProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 	}
 	case WM_COMMAND:
 		if (SettingsHandleCommand(L.settings, wp)) return 0;
+		if (SettingsHandleCommand(L.picture, wp)) return 0;
 		if (BindingsHandleCommand(L.bindings, wp)) return 0;
 		switch (LOWORD(wp))
 		{
@@ -750,6 +773,7 @@ static LRESULT CALLBACK LauncherProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		case IDC_CLOSE:			DestroyWindow(hwnd); return 0;
 		case IDC_RESET:
 			if (L.page == PAGE_BUTTONS) ResetBindings(L.bindings);
+			else if (L.page == PAGE_PICTURE) ResetDefaults(L.picture);
 			else ResetDefaults(L.settings);
 			return 0;
 		case IDC_OPEN_SHOGO:
@@ -764,6 +788,7 @@ static LRESULT CALLBACK LauncherProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 		return 0;
 	case WM_HSCROLL:
 		SettingsHandleScroll(L.settings, lp);
+		SettingsHandleScroll(L.picture, lp);
 		return 0;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -838,8 +863,8 @@ static bool RunLauncherWindow(const std::wstring& exeDir, int startPage)
 	};
 
 	L.tabs = make(WC_TABCONTROLW, L"", WS_CLIPSIBLINGS, S(16), L.headerH + S(6), L.W - S(32), L.tabsH, IDC_TABS, L.font);
-	const wchar_t* names[] = { L"  Play  ", L"  VR Settings  ", L"  Controller Buttons  ", L"  About && Legal  " };
-	for (int i = 0; i < 4; ++i)
+	const wchar_t* names[] = { L"  Play  ", L"  VR Settings  ", L"  Picture  ", L"  Controller Buttons  ", L"  About && Legal  " };
+	for (int i = 0; i < 5; ++i)
 	{
 		TCITEMW it = {};
 		it.mask = TCIF_TEXT;
@@ -859,7 +884,8 @@ static bool RunLauncherWindow(const std::wstring& exeDir, int startPage)
 	L.openShogo = make(L"BUTTON", L"Open Shogo's own launcher", BS_OWNERDRAW | WS_TABSTOP, L.W - S(24) - S(220), pby - S(46), S(220), S(32), IDC_OPEN_SHOGO, L.font);
 	L.openFolder = make(L"BUTTON", L"Open the ShogoVR folder", BS_OWNERDRAW | WS_TABSTOP, L.W - S(24) - S(220), pby - S(8), S(220), S(32), IDC_OPEN_FOLDER, L.font);
 
-	CreateSettingsPanel(L.settings, hwnd, L.font, L.head, S(24), L.pageRect.top + S(8), L.W - S(48), L.modDir);
+	CreateSettingsPanel(L.settings, hwnd, L.font, L.head, S(24), L.pageRect.top + S(8), L.W - S(48), L.modDir, 0);
+	CreateSettingsPanel(L.picture, hwnd, L.font, L.head, S(24), L.pageRect.top + S(8), L.W - S(48), L.modDir, 1);
 	CreateBindingsPanel(L.bindings, hwnd, L.font, L.head, S(24), L.pageRect.top + S(12), L.W - S(48), L.modDir);
 	L.resetBtn = make(L"BUTTON", L"Reset to defaults", BS_OWNERDRAW | WS_TABSTOP, S(20), by, S(160), S(36), IDC_RESET, L.font);
 

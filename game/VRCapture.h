@@ -16,5 +16,6 @@ void	VRCapture_SetGame(void* hwnd, void* pShared, int bEnabled);		// pShared: th
 void	VRCapture_Uninstall();		// must run before the DLL unloads
 int		VRCapture_Frames();			// frames handed over so far
 int		VRCapture_Seen();			// frames seen from the game's window
+void	VRCapture_SetFramePose(long nPoseId);	// pose of the frame being drawn now (0 = none)
 
 #endif

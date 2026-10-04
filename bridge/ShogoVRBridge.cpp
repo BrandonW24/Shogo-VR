@@ -526,6 +526,8 @@ public:
 		return g;
 	}
 
+	volatile long* FramePosePtr() { return m_p ? &m_p->capturePoseId : nullptr; }
+
 private:
 	HANDLE			m_mapping = nullptr;
 	ShogoVRShared*	m_p = nullptr;
@@ -636,6 +638,9 @@ public:
 
 	// Direct capture: the game's renderer copies each finished frame into a
 	// shared texture (the game's VRCapture.cpp).  Returns true for a new frame.
+	long			m_framePoseId = 0;			// pose stamped on the last frame taken (0 = none)
+	volatile long*	m_pFramePose = nullptr;		// where the game stamps it (shared memory)
+
 	bool UpdateShared(DWORD handle)
 	{
 		if (!handle) { CloseShared(); return false; }
@@ -685,6 +690,7 @@ public:
 
 		if (m_sharedMutex->AcquireSync(1, 0) != S_OK) return false;		// no new frame yet
 		m_ctx->CopyResource(m_tex, m_shared);
+		m_framePoseId = m_pFramePose ? *m_pFramePose : 0;		// can't change while we hold the mutex
 		m_sharedMutex->ReleaseSync(0);
 		m_hasImage = true;
 		return true;
@@ -1380,7 +1386,11 @@ private:
 	bool			m_leftHanded = false;
 	bool			m_directCapture = true;		// take frames straight from the game's renderer when it offers them
 	bool			m_usingDirect = false;
+	GameInfo		ToCaptureSpace(const GameInfo& g);
 	bool			m_oversize = false;			// window as big as the game's resolution, even beyond the screen
+	int				m_renderScale = 1;			// dgVoodoo renders at this multiple of the game's resolution (Picture tab)
+	unsigned		m_sumCaptured = 0, m_sumSubmitted = 0, m_sumStamped = 0, m_sumPictures = 0;
+	float			m_sumSecs = 0.0f;
 	bool			m_spectatorOn = false;		// off unless wanted (Ctrl+Shift+M / settings)
 	bool			m_spectatorKeyDown = false;
 	Spectator		m_spectator;
@@ -1875,6 +1885,22 @@ static bool ClientFullyOnMonitor(HWND hwnd)
 
 // Works out where the game window should be and how big, so that its inside
 // is exactly the game's resolution (pixel-for-pixel = sharpest capture).
+// The game reports its layout (eye height, HUD strip) in its own pixels; when
+// the picture arrives bigger (dgVoodoo rendering at 2x), scale those to it.
+GameInfo Bridge::ToCaptureSpace(const GameInfo& g)
+{
+	GameInfo c = g;
+	if (!m_usingDirect || g.captureWidth <= 0 || g.captureHeight <= 0 || g.renderWidth <= 0 || g.renderHeight <= 0) return c;
+	if (g.captureWidth == g.renderWidth && g.captureHeight == g.renderHeight) return c;
+	double sx = (double)g.captureWidth / g.renderWidth, sy = (double)g.captureHeight / g.renderHeight;
+	if (c.eyeHeight > 0) c.eyeHeight = (LONG)(c.eyeHeight * sy + 0.5);
+	c.hudX = (LONG)(c.hudX * sx + 0.5);
+	c.hudY = (LONG)(c.hudY * sy + 0.5);
+	c.hudW = (LONG)(c.hudW * sx + 0.5);
+	c.hudH = (LONG)(c.hudH * sy + 0.5);
+	return c;
+}
+
 bool Bridge::PlanWindow(const GameInfo& g, WindowPlan& p)
 {
 	HWND hwnd = g.hwnd;
@@ -1907,6 +1933,7 @@ bool Bridge::PlanWindow(const GameInfo& g, WindowPlan& p)
 	};
 
 	LONG cw = g.renderWidth, ch = g.renderHeight, ow = 0, oh = 0;
+	if (m_oversize) { cw *= m_renderScale; ch *= m_renderScale; }		// room for dgVoodoo's higher resolution
 	outerSize(style, exStyle, cw, ch, ow, oh);
 
 	if (ow <= workW && oh <= workH)
@@ -2381,6 +2408,7 @@ bool Bridge::CaptureFrame(const GameInfo& g)
 	bool bDirect = m_directCapture && g.captureHandle && !m_capture.SharedFailed(g.captureHandle);
 	if (bDirect)
 	{
+		m_capture.m_pFramePose = m_link.FramePosePtr();
 		bool bNew = m_capture.UpdateShared(g.captureHandle);
 		if (!m_capture.SharedFailed(g.captureHandle))
 		{
@@ -2392,12 +2420,13 @@ bool Bridge::CaptureFrame(const GameInfo& g)
 			}
 			// If the renderer draws at the window's size, the window has to be
 			// as big as the game's resolution - even bigger than the screen.
+			LONG wantW = g.renderWidth * m_renderScale, wantH = g.renderHeight * m_renderScale;
 			if (!m_oversize && g.captureWidth > 0 && g.captureHeight > 0 &&
-				(g.captureWidth < g.renderWidth || g.captureHeight < g.renderHeight))
+				(g.captureWidth < wantW || g.captureHeight < wantH))
 			{
 				m_oversize = true;
 				printf("\nThe renderer draws at the window's size (%ldx%ld), so the Shogo window is being made %ldx%ld, "
-					   "even though that's bigger than your screen.\n", g.captureWidth, g.captureHeight, g.renderWidth, g.renderHeight);
+					   "even though that's bigger than your screen.\n", g.captureWidth, g.captureHeight, wantW, wantH);
 				FixGameWindow(g, false);
 			}
 			return bNew;
@@ -2714,6 +2743,7 @@ void Bridge::LoadSettings(bool bFirst)
 	GetPrivateProfileStringW(L"Comfort", L"Vignette", L"0", buf, 64, ini);
 	float vignette = std::max(0.0f, std::min(1.0f, (float)_wtof(buf)));
 	LoadBindings(ini);
+	m_renderScale = std::max(1, std::min(4, (int)GetPrivateProfileIntW(L"Launch", L"RenderScale", 2, ini)));
 	bool direct = GetPrivateProfileIntW(L"Picture", L"DirectCapture", 1, ini) != 0;
 	bool spectator = GetPrivateProfileIntW(L"Picture", L"Spectator", 0, ini) != 0;
 
@@ -2822,19 +2852,27 @@ void Bridge::Frame()
 	if (g.alive && g.viewMode != SHOGOVR_VIEW_OFF && CaptureFrame(g))
 	{
 		++m_capturedFrames;
-		m_shown = g;		// remember what this picture was rendered with
+		GameInfo gc = ToCaptureSpace(g);
+		// The pose this exact picture was rendered from (stamped with the frame).
+		if (m_usingDirect && m_capture.m_framePoseId != 0) gc.usedPoseId = m_capture.m_framePoseId;
+		if (gc.viewMode == SHOGOVR_VIEW_TRACKED)
+		{
+			++m_sumPictures;
+			if (m_usingDirect && m_capture.m_framePoseId != 0) ++m_sumStamped;
+		}
+		m_shown = gc;		// remember what this picture was rendered with
 		if (fs.shouldRender)
 		{
-			if (g.viewMode == SHOGOVR_VIEW_FLAT)
+			if (gc.viewMode == SHOGOVR_VIEW_FLAT)
 			{
-				CopyScreen(g);
+				CopyScreen(gc);
 			}
 			else
 			{
-				CopyEyes(g);
-				if (g.layoutFlags & SHOGOVR_LAYOUT_HUD) CopyHud(g);
+				CopyEyes(gc);
+				if (gc.layoutFlags & SHOGOVR_LAYOUT_HUD) CopyHud(gc);
 			}
-			DrawSpectator(g);
+			DrawSpectator(gc);
 		}
 	}
 
@@ -2964,6 +3002,25 @@ void Bridge::PrintStatus(const GameInfo& g)
 	printf("\r%-46s | capture %5.1f fps | headset %5.1f fps | eye %ux%u %s      ",
 		   game, m_capturedFrames / secs, m_submittedFrames / secs, m_eyes[0].w, m_eyes[0].h, cap ? cap : "");
 	fflush(stdout);
+
+	// Every 30 s of head-tracked play, a summary in the log (the bridge has
+	// no console when the game starts it).
+	m_sumCaptured += m_capturedFrames;
+	m_sumSubmitted += m_submittedFrames;
+	m_sumSecs += secs;
+	if (m_sumSecs >= 30.0f)
+	{
+		if (g.alive && g.viewMode == SHOGOVR_VIEW_TRACKED && m_sumCaptured > 0)
+		{
+			int stamped = (int)(100.0 * m_sumStamped / std::max(1u, m_sumPictures) + 0.5);
+			printf("\nLast 30 s: game %.0f frames/s, headset %.0f frames/s, picture %ldx%ld, "
+				   "%d%% of pictures paired with their exact head pose.\n",
+				   m_sumCaptured / m_sumSecs, m_sumSubmitted / m_sumSecs, m_shown.captureWidth, m_shown.captureHeight, stamped);
+		}
+		m_sumCaptured = m_sumSubmitted = 0;
+		m_sumSecs = 0.0f;
+		m_sumStamped = m_sumPictures = 0;
+	}
 	m_capturedFrames = m_submittedFrames = 0;
 }
 

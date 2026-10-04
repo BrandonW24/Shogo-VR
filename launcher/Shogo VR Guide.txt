@@ -36,7 +36,18 @@ TWO-HANDED AIMING AND YOUR BODY
   hands are the gun in your hand. "VRBodyInfo" in the console lists the
   model's parts if something that should be hidden isn't.
 
+PICTURE AND AIMING
+- The launcher's Picture tab sets dgVoodoo's picture quality. By default
+  the game renders at 2x its resolution with smooth edges (2x) and sharp
+  texture filtering. If your graphics card struggles, set "Render
+  resolution" back to the game's resolution.
+- VR Settings -> Aim helper: a laser beam with a dot, just a dot, the
+  game's reticle, or nothing.
+
 IF SOMETHING GOES WRONG
+- If Shogo crashes, ShogoVR_game.log (in the ShogoVR folder) says where,
+  and ShogoVR_crash.dmp holds a crash dump - please include both in a bug
+  report.
 - Don't start ShogoVRBridge.exe by hand: the game starts it, with the same
   rights as the game. (If Shogo runs as administrator, a bridge started
   without them can't manage Shogo's window - Shogo then stays a small black

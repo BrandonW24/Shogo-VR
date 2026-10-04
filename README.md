@@ -45,6 +45,10 @@ https://youtu.be/d2rjNoYvyQU
     <p align="center"><img src="launcher/assets/rebind_menu.png" alt="Shogo VR" width="640"></p>
 
 
+* Configurable picture quality settings
+
+  <p align="center"><img src="launcher/assets/picture_settings.png" alt="Shogo VR" width="640"></p>
+
 ## Requirements
 
 - Your own copy of **Shogo: Mobile Armor Division v2.2** ([Steam](https://store.steampowered.com/) or [GOG](https://www.gog.com/)).

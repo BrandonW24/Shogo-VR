@@ -492,6 +492,74 @@ static int FixDgVoodooVram(const std::wstring& gameDir, int targetMB, bool bOnly
 	return 0;
 }
 
+// Sets one option in the [DirectX] section of dgVoodoo's config - only that
+// value is rewritten (the line is added if it's missing), and the original
+// file is kept once as .shogovr-backup.  1 = changed, 0 = already so or no
+// dgVoodoo config, -1 = couldn't write it.
+static int SetDgVoodooDirectX(const std::wstring& gameDir, const char* key, const std::string& value)
+{
+	std::vector<std::wstring> confs;
+	confs.push_back(JoinPath(gameDir, L"dgVoodoo.conf"));
+	wchar_t appData[MAX_PATH] = L"";
+	if (GetEnvironmentVariableW(L"APPDATA", appData, MAX_PATH)) confs.push_back(JoinPath(appData, L"dgVoodoo\\dgVoodoo.conf"));
+	size_t keyLen = strlen(key);
+
+	for (const std::wstring& conf : confs)
+	{
+		std::vector<char> raw;
+		if (!FileExists(conf) || !ReadWholeFile(conf, raw)) continue;
+		std::string text(raw.begin(), raw.end());
+		std::string nl = text.find("\r\n") != std::string::npos ? "\r\n" : "\n";
+
+		bool bInDirectX = false;
+		size_t afterHeader = std::string::npos, pos = 0;
+		while (pos <= text.size())
+		{
+			size_t eol = text.find('\n', pos);
+			if (eol == std::string::npos) eol = text.size();
+			std::string line = text.substr(pos, eol - pos);
+			size_t a = line.find_first_not_of(" \t");
+			std::string t = (a == std::string::npos) ? "" : line.substr(a);
+			if (!t.empty() && t.back() == '\r') t.pop_back();
+
+			if (!t.empty() && t[0] == '[')
+			{
+				if (bInDirectX) break;		// end of [DirectX] without the key
+				bInDirectX = (_strnicmp(t.c_str(), "[DirectX]", 9) == 0);
+				if (bInDirectX) afterHeader = eol + 1;
+			}
+			else if (bInDirectX && _strnicmp(t.c_str(), key, keyLen) == 0 && t.size() > keyLen &&
+					 (t[keyLen] == ' ' || t[keyLen] == '\t' || t[keyLen] == '='))
+			{
+				size_t eqT = t.find('=');
+				if (eqT == std::string::npos) { pos = eol + 1; continue; }
+				std::string cur = t.substr(eqT + 1);
+				size_t v0 = cur.find_first_not_of(" \t");
+				cur = (v0 == std::string::npos) ? "" : cur.substr(v0);
+				while (!cur.empty() && (cur.back() == ' ' || cur.back() == '\t')) cur.pop_back();
+				if (_stricmp(cur.c_str(), value.c_str()) == 0) return 0;
+
+				std::wstring backup = conf + L".shogovr-backup";
+				if (!FileExists(backup) && !WriteWholeFile(backup, raw.data(), raw.size())) return -1;
+				size_t eq = line.find('=');
+				std::string newLine = line.substr(0, eq + 1) + " " + value;
+				if (!line.empty() && line.back() == '\r') newLine += "\r";
+				text.replace(pos, eol - pos, newLine);
+				return WriteWholeFile(conf, text.data(), text.size()) ? 1 : -1;
+			}
+			if (eol >= text.size()) break;
+			pos = eol + 1;
+		}
+		if (afterHeader == std::string::npos) return 0;		// no [DirectX] section: leave it
+
+		std::wstring backup = conf + L".shogovr-backup";
+		if (!FileExists(backup) && !WriteWholeFile(backup, raw.data(), raw.size())) return -1;
+		text.insert(std::min(afterHeader, text.size()), std::string(key) + " = " + value + nl);
+		return WriteWholeFile(conf, text.data(), text.size()) ? 1 : -1;
+	}
+	return 0;
+}
+
 // ======================================================================= //
 //  Running copies of the game
 // ======================================================================= //

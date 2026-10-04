@@ -11,7 +11,6 @@
 #include "RiotCommandIDs.h"
 #include "ModelFuncs.h"
 #include "CharacterAlignment.h"
-#include "WeaponDefs.h"
 #include "VRCapture.h"
 #include "BitmapFont.h"
 #include "TextHelper.h"
@@ -22,6 +21,9 @@
 #include <ctype.h>
 #include <stdarg.h>
 #include <time.h>
+
+static void VRInstallCrashReporter();
+static void VRRemoveCrashReporter();
 
 CVRStereo g_VRStereo;
 
@@ -147,6 +149,9 @@ CVRStereo::CVRStereo()
 	m_fMenuRepeatTime		= 0.0f;
 	m_fWorldScaleUsed		= 40.0f;
 	m_hAimMarker			= DNULL;
+	m_hAimDot				= DNULL;
+	m_hLaser				= DNULL;
+	{ int k; for (k = 0; k < 5; k++) m_hLaserLines[k] = DNULL; }
 	m_bTwoHanded			= DFALSE;
 	VEC_SET(m_vAimF, 0.0f, 0.0f, 1.0f);
 	VEC_SET(m_vAimU, 0.0f, 1.0f, 0.0f);
@@ -255,6 +260,8 @@ void CVRStereo::Init(CClientDE* pClientDE)
 	m_vtGunY.Init			(pClientDE, "VRGunY",			NULL, 0.0f);
 	m_vtGunZ.Init			(pClientDE, "VRGunZ",			NULL, 0.0f);
 	m_vtAimMarker.Init		(pClientDE, "VRAimMarker",		NULL, 1.0f);
+	m_vtAimStyle.Init		(pClientDE, "VRAimStyle",		NULL, 2.0f);
+	m_vtAimDotSize.Init		(pClientDE, "VRAimDotSize",		NULL, 1.0f);
 	m_vtGunScale.Init		(pClientDE, "VRGunScale",		NULL, 1.5f);
 	m_vtGunScaleMCA.Init	(pClientDE, "VRGunScaleMCA",	NULL, 1.0f);
 	m_vtFixRenderer.Init	(pClientDE, "VRFixRenderer",	NULL, 1.0f);
@@ -292,6 +299,7 @@ void CVRStereo::Init(CClientDE* pClientDE)
 
 	LoadSettingsFile(DTRUE);
 	Log("Shogo VR started (CShell.dll built " __DATE__ " " __TIME__ ")");
+	VRInstallCrashReporter();
 	RememberCommandLine();
 	StartBridgeIfNeeded();
 
@@ -335,6 +343,8 @@ void CVRStereo::Init(CClientDE* pClientDE)
 
 void CVRStereo::Term()
 {
+	Log("Shogo VR closing normally");
+	VRRemoveCrashReporter();				// before this DLL goes away
 	ReleaseTransformKey();
 
 	// Close the headset bridge if the game started it.
@@ -353,6 +363,8 @@ void CVRStereo::Term()
 		m_pfnIsCommandOn = DNULL;
 	}
 	m_hAimMarker = DNULL;
+	m_hAimDot = DNULL;
+	m_hLaser = DNULL;
 	m_hBody = DNULL;
 	m_hHeldGun = DNULL;
 	CloseShared();
@@ -380,7 +392,7 @@ void CVRStereo::BeginFrame(DBOOL bFlat, DBOOL bHudStripAllowed)
 
 	if (m_bFlatFrame)
 	{
-		if (m_hAimMarker) m_pClientDE->SetObjectFlags(m_hAimMarker, 0);	// world objects - keep them out of cutscenes
+		HideAimHelpers();				// world objects - keep them out of cutscenes
 		HideBody();
 		if (m_hHeldGun) m_pClientDE->SetObjectFlags(m_hHeldGun, 0);
 		m_bHudStrip			= DFALSE;
@@ -874,6 +886,7 @@ void CVRStereo::RenderStereo(HLOCALOBJ hCamera, HLOCALOBJ* pObjects, int nObject
 	m_fReportSep		= fReportSep;
 	m_nReportViewMode	= bTracked ? SHOGOVR_VIEW_TRACKED : SHOGOVR_VIEW_SCREEN;
 	m_nReportPoseId		= bTracked ? m_nPoseId : 0;
+	VRCapture_SetFramePose(m_nReportPoseId);			// stamped onto the captured frame
 	m_bHeadApplied		= DFALSE;
 
 	WriteGameBlock();
@@ -2087,32 +2100,27 @@ void CVRStereo::CheckRenderer(DBOOL bStable)
 	m_fRendererBadSince = -1.0f;
 }
 
+void CVRStereo::HideAimHelpers()
+{
+	if (!m_pClientDE) return;
+	if (m_hAimMarker) m_pClientDE->SetObjectFlags(m_hAimMarker, 0);
+	if (m_hAimDot) m_pClientDE->SetObjectFlags(m_hAimDot, 0);
+	if (m_hLaser) m_pClientDE->SetObjectFlags(m_hLaser, 0);
+}
+
+// Where the gun points: a laser beam with a dot, just a dot, or the game's
+// reticle (VRAimStyle 0 / 1 / 2; 3 = nothing).
 void CVRStereo::UpdateAimMarker(HLOCALOBJ hCamera, HLOCALOBJ* pFilterList)
 {
 	if (!m_pClientDE || !hCamera) return;
 	CClientDE* pClientDE = m_pClientDE;
 
-	DBOOL bShow = m_bAimByHand && m_vtAimMarker.GetFloat(1.0f) != 0.0f;
-	if (!bShow)
+	int nStyle = (int)m_vtAimStyle.GetFloat(2.0f);
+	if (m_vtAimMarker.GetFloat(1.0f) == 0.0f) nStyle = 3;		// older on/off setting
+	if (!m_bAimByHand || nStyle < 0 || nStyle > 2)
 	{
-		if (m_hAimMarker) pClientDE->SetObjectFlags(m_hAimMarker, 0);
+		HideAimHelpers();
 		return;
-	}
-
-	if (!m_hAimMarker)
-	{
-		// Same sprite and settings the game uses for its third-person crosshair.
-		ObjectCreateStruct theStruct;
-		INIT_OBJECTCREATESTRUCT(theStruct);
-		theStruct.m_ObjectType = OT_SPRITE;
-		strncpy(theStruct.m_Filename, "Sprites\\Crosshair.spr", sizeof(theStruct.m_Filename) - 1);
-		theStruct.m_Flags = FLAG_VISIBLE | FLAG_GLOWSPRITE | FLAG_NOLIGHT;
-		m_hAimMarker = pClientDE->CreateObject(&theStruct);
-		if (!m_hAimMarker) return;
-
-		DVector vScale;
-		VEC_SET(vScale, 0.5f, 0.5f, 1.0f);
-		pClientDE->SetObjectScale(m_hAimMarker, &vScale);
 	}
 
 	// Cast from the hand along the gun.
@@ -2131,7 +2139,6 @@ void CVRStereo::UpdateAimMarker(HLOCALOBJ hCamera, HLOCALOBJ* pFilterList)
 	query.m_FilterFn	= pFilterList ? ObjListFilterFn : DNULL;
 	query.m_pUserData	= pFilterList;
 
-	DVector vHit;
 	DFLOAT fDist = VR_AIM_RANGE;
 	if (pClientDE->IntersectSegment(&query, &info))
 	{
@@ -2140,13 +2147,117 @@ void CVRStereo::UpdateAimMarker(HLOCALOBJ hCamera, HLOCALOBJ* pFilterList)
 		fDist = VEC_MAG(vDiff);
 	}
 
-	// Pull it slightly towards you so it doesn't sink into walls.
+	// Pull the marker slightly towards you so it doesn't sink into walls.
 	DFLOAT fPlace = (fDist > 20.0f) ? fDist - 8.0f : fDist * 0.6f;
+	DVector vHit;
 	VEC_MULSCALAR(vHit, vHandF, fPlace);
 	VEC_ADD(vHit, vHit, vHandPos);
 
-	pClientDE->SetObjectPos(m_hAimMarker, &vHit);
-	pClientDE->SetObjectFlags(m_hAimMarker, FLAG_VISIBLE | FLAG_GLOWSPRITE | FLAG_NOLIGHT);
+	// Reticle: the same sprite the game uses for its third-person crosshair.
+	if (nStyle == 2)
+	{
+		if (!m_hAimMarker)
+		{
+			ObjectCreateStruct theStruct;
+			INIT_OBJECTCREATESTRUCT(theStruct);
+			theStruct.m_ObjectType = OT_SPRITE;
+			strncpy(theStruct.m_Filename, "Sprites\\Crosshair.spr", sizeof(theStruct.m_Filename) - 1);
+			theStruct.m_Flags = FLAG_VISIBLE | FLAG_GLOWSPRITE | FLAG_NOLIGHT;
+			m_hAimMarker = pClientDE->CreateObject(&theStruct);
+			if (!m_hAimMarker) return;
+			DVector vScale;
+			VEC_SET(vScale, 0.5f, 0.5f, 1.0f);
+			pClientDE->SetObjectScale(m_hAimMarker, &vScale);
+		}
+		pClientDE->SetObjectPos(m_hAimMarker, &vHit);
+		pClientDE->SetObjectFlags(m_hAimMarker, FLAG_VISIBLE | FLAG_GLOWSPRITE | FLAG_NOLIGHT);
+	}
+	else if (m_hAimMarker) pClientDE->SetObjectFlags(m_hAimMarker, 0);
+
+	// Dot (laser and dot styles): a red dot that stays the same size on screen.
+	// Not a "glow" sprite - those shrink more slowly with distance, which made
+	// the dot grow the further away it was.
+	if (nStyle == 0 || nStyle == 1)
+	{
+		if (!m_hAimDot)
+		{
+			ObjectCreateStruct theStruct;
+			INIT_OBJECTCREATESTRUCT(theStruct);
+			theStruct.m_ObjectType = OT_SPRITE;
+			strncpy(theStruct.m_Filename, "Sprites\\glow.spr", sizeof(theStruct.m_Filename) - 1);
+			theStruct.m_Flags = FLAG_VISIBLE | FLAG_NOLIGHT;
+			m_hAimDot = pClientDE->CreateObject(&theStruct);
+			if (!m_hAimDot) return;
+		}
+		DFLOAT fSize = m_vtAimDotSize.GetFloat(1.0f);
+		if (fSize < 0.1f) fSize = 0.1f;
+		DFLOAT fScale = fSize * 0.0004f * fPlace;		// grows with distance = same size on screen
+		if (fScale < 0.01f * fSize) fScale = 0.01f * fSize;
+		DVector vScale;
+		VEC_SET(vScale, fScale, fScale, 1.0f);
+		pClientDE->SetObjectScale(m_hAimDot, &vScale);
+		pClientDE->SetObjectColor(m_hAimDot, 1.0f, 0.12f, 0.08f, 1.0f);
+		pClientDE->SetObjectPos(m_hAimDot, &vHit);
+		pClientDE->SetObjectFlags(m_hAimDot, FLAG_VISIBLE | FLAG_NOLIGHT);
+	}
+	else if (m_hAimDot) pClientDE->SetObjectFlags(m_hAimDot, 0);
+
+	// Laser: a thin red beam from just ahead of the gun to the dot.
+	if (nStyle == 0)
+	{
+		if (!m_hLaser)
+		{
+			ObjectCreateStruct theStruct;
+			INIT_OBJECTCREATESTRUCT(theStruct);
+			theStruct.m_ObjectType = OT_LINESYSTEM;
+			theStruct.m_Flags = FLAG_VISIBLE;
+			VEC_COPY(theStruct.m_Pos, vHandPos);
+			m_hLaser = pClientDE->CreateObject(&theStruct);
+			if (!m_hLaser) return;
+		}
+
+		DVector vStart, vT, vR;
+		VEC_MULSCALAR(vT, vHandF, 4.0f * m_fWorldScaleUsed / 40.0f);		// a hand's width ahead (about 10 cm)
+		VEC_ADD(vStart, vHandPos, vT);
+		VEC_CROSS(vR, vHandU, vHandF);
+		VEC_NORM(vR);
+
+		// Five lines from slightly spread starts to one end: reads as a beam
+		// rather than a single pixel line.
+		DFLOAT fSpread = 0.003f * m_fWorldScaleUsed;
+		DVector vOffsets[5];
+		VEC_INIT(vOffsets[0]);
+		VEC_MULSCALAR(vOffsets[1], vR, fSpread);
+		VEC_MULSCALAR(vOffsets[2], vR, -fSpread);
+		VEC_MULSCALAR(vOffsets[3], vHandU, fSpread);
+		VEC_MULSCALAR(vOffsets[4], vHandU, -fSpread);
+
+		DRotation rIdentity;
+		ROT_INIT(rIdentity);
+		pClientDE->SetObjectPos(m_hLaser, &vStart);
+		pClientDE->SetObjectRotation(m_hLaser, &rIdentity);
+
+		// The lines are replaced every frame rather than moved: the engine works
+		// out where a line system is visible when its lines are added, so moved
+		// lines can end up never being drawn.
+		int k;
+		for (k = 0; k < 5; k++)
+		{
+			if (m_hLaserLines[k]) pClientDE->RemoveLine(m_hLaser, m_hLaserLines[k]);
+			m_hLaserLines[k] = DNULL;
+		}
+		for (k = 0; k < 5; k++)
+		{
+			DELine line;
+			VEC_COPY(line.m_Points[0].m_Pos, vOffsets[k]);
+			VEC_SUB(line.m_Points[1].m_Pos, vHit, vStart);
+			line.m_Points[0].r = 1.0f;	line.m_Points[0].g = 0.1f;	line.m_Points[0].b = 0.08f;	line.m_Points[0].a = k ? 0.45f : 0.9f;
+			line.m_Points[1].r = 1.0f;	line.m_Points[1].g = 0.1f;	line.m_Points[1].b = 0.08f;	line.m_Points[1].a = k ? 0.25f : 0.6f;
+			m_hLaserLines[k] = pClientDE->AddLine(m_hLaser, &line);
+		}
+		pClientDE->SetObjectFlags(m_hLaser, FLAG_VISIBLE);
+	}
+	else if (m_hLaser) pClientDE->SetObjectFlags(m_hLaser, 0);
 }
 
 void CVRStereo::OnExitWorld()
@@ -2156,6 +2267,11 @@ void CVRStereo::OnExitWorld()
 		m_pClientDE->DeleteObject(m_hAimMarker);
 	}
 	m_hAimMarker = DNULL;
+	if (m_pClientDE && m_hAimDot) m_pClientDE->DeleteObject(m_hAimDot);
+	if (m_pClientDE && m_hLaser) m_pClientDE->DeleteObject(m_hLaser);
+	m_hAimDot = DNULL;
+	m_hLaser = DNULL;
+	{ int k; for (k = 0; k < 5; k++) m_hLaserLines[k] = DNULL; }
 	if (m_pClientDE && m_hBody)
 	{
 		m_pClientDE->DeleteObject(m_hBody);
@@ -2317,7 +2433,7 @@ void CVRStereo::DumpModelNodes(HLOCALOBJ hObj, int nWeaponId)
 
 	FILE* f = fopen(szPath, "a");
 	if (!f) return;
-	fprintf(f, "Weapon %d (first-person model %s):", nWeaponId, GetPVModelName(nWeaponId) ? GetPVModelName(nWeaponId) : "?");
+	fprintf(f, "Weapon %d (first-person model):", nWeaponId);
 	HMODELNODE hNode = INVALID_MODEL_NODE;
 	int n = 0;
 	while (m_pClientDE->GetNextModelNode(hObj, hNode, &hNode) == LT_OK)
@@ -2489,6 +2605,99 @@ void CVRStereo::DrawOpeningNotice(void* pFont)
 		pClientDE->DrawSurfaceToSurfaceTransparent(hScreen, m_hNotice[i], DNULL, ((int)nScreenW - (int)w[i]) / 2, y, DNULL);
 		y += (int)h[i] + 4;
 	}
+}
+
+DBOOL CVRStereo::GameHasFocus()
+{
+	return m_nGameHwnd && GetForegroundWindow() == (HWND)m_nGameHwnd;
+}
+
+// ======================================================================= //
+//	Crash reporting: which module failed and where, in ShogoVR_game.log, plus
+//	a crash dump (ShogoVR\ShogoVR_crash.dmp) - so a crash can be traced.
+// ======================================================================= //
+
+static PVOID						s_hVectored = NULL;
+static LPTOP_LEVEL_EXCEPTION_FILTER	s_pfnPrevFilter = NULL;
+static DBOOL						s_bFilterInstalled = DFALSE;
+
+static void VRDescribeAddress(void* pAddr, char* szOut, int nOut)
+{
+	HMODULE hMod = NULL;
+	char szPath[MAX_PATH] = "?";
+	if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)pAddr, &hMod) && hMod)
+		GetModuleFileNameA(hMod, szPath, MAX_PATH);
+	const char* pName = strrchr(szPath, '\\');
+	pName = pName ? pName + 1 : szPath;
+	_snprintf(szOut, nOut - 1, "%s+0x%lX", pName, (unsigned long)((char*)pAddr - (char*)hMod));
+	szOut[nOut - 1] = 0;
+}
+
+static LONG CALLBACK VRVectoredHandler(EXCEPTION_POINTERS* p)
+{
+	DWORD dwCode = p->ExceptionRecord->ExceptionCode;
+	if (dwCode != EXCEPTION_ACCESS_VIOLATION && dwCode != EXCEPTION_STACK_OVERFLOW && dwCode != EXCEPTION_ILLEGAL_INSTRUCTION &&
+		dwCode != EXCEPTION_INT_DIVIDE_BY_ZERO && dwCode != EXCEPTION_PRIV_INSTRUCTION) return EXCEPTION_CONTINUE_SEARCH;
+	static LONG s_nCount = 0;
+	if (InterlockedIncrement(&s_nCount) > 5) return EXCEPTION_CONTINUE_SEARCH;		// a handful is enough
+	char szWhere[160];
+	VRDescribeAddress(p->ExceptionRecord->ExceptionAddress, szWhere, sizeof(szWhere));
+	g_VRStereo.Log("Exception 0x%08lX at %s (it may still be handled)", (unsigned long)dwCode, szWhere);
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+typedef BOOL (WINAPI *VRMiniDumpWriteDumpFn)(HANDLE, DWORD, HANDLE, int, void*, void*, void*);
+struct VRMiniDumpExceptionInfo { DWORD ThreadId; EXCEPTION_POINTERS* ExceptionPointers; BOOL ClientPointers; };
+
+static LONG WINAPI VRUnhandledFilter(EXCEPTION_POINTERS* p)
+{
+	char szWhere[160];
+	VRDescribeAddress(p->ExceptionRecord->ExceptionAddress, szWhere, sizeof(szWhere));
+	g_VRStereo.Log("CRASH: exception 0x%08lX at %s", (unsigned long)p->ExceptionRecord->ExceptionCode, szWhere);
+
+	// A small crash dump next to the logs.
+	const char* szIni = g_VRStereo.GetIniPath();
+	HMODULE hDbgHelp = LoadLibraryA("dbghelp.dll");
+	VRMiniDumpWriteDumpFn pfnDump = hDbgHelp ? (VRMiniDumpWriteDumpFn)GetProcAddress(hDbgHelp, "MiniDumpWriteDump") : NULL;
+	if (pfnDump && szIni && szIni[0])
+	{
+		char szPath[320];
+		strncpy(szPath, szIni, sizeof(szPath) - 1);
+		szPath[sizeof(szPath) - 1] = 0;
+		char* pSlash = strrchr(szPath, '\\');
+		if (pSlash)
+		{
+			strcpy(pSlash + 1, "ShogoVR_crash.dmp");
+			HANDLE hFile = CreateFileA(szPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			if (hFile != INVALID_HANDLE_VALUE)
+			{
+				VRMiniDumpExceptionInfo mei;
+				mei.ThreadId = GetCurrentThreadId();
+				mei.ExceptionPointers = p;
+				mei.ClientPointers = FALSE;
+				if (pfnDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, 0 /* MiniDumpNormal */, &mei, NULL, NULL))
+					g_VRStereo.Log("Crash dump saved as ShogoVR_crash.dmp");
+				CloseHandle(hFile);
+			}
+		}
+	}
+	return s_pfnPrevFilter ? s_pfnPrevFilter(p) : EXCEPTION_CONTINUE_SEARCH;
+}
+
+static void VRInstallCrashReporter()
+{
+	if (!s_hVectored) s_hVectored = AddVectoredExceptionHandler(0, VRVectoredHandler);
+	if (!s_bFilterInstalled)
+	{
+		s_pfnPrevFilter = SetUnhandledExceptionFilter(VRUnhandledFilter);
+		s_bFilterInstalled = DTRUE;
+	}
+}
+
+static void VRRemoveCrashReporter()
+{
+	if (s_hVectored) { RemoveVectoredExceptionHandler(s_hVectored); s_hVectored = NULL; }
+	if (s_bFilterInstalled) { SetUnhandledExceptionFilter(s_pfnPrevFilter); s_bFilterInstalled = DFALSE; }
 }
 
 void CVRStereo::SetMechMode(DBOOL bMech, DBOOL bVehicle)
@@ -2839,29 +3048,56 @@ void CVRStereo::PrintBodyInfo(HLOCALOBJ hWeaponModel)
 
 // The models other players see you holding (from the game's weapon
 // definitions on the server side).  Their origin is the grip.
+// Shogo's weapon numbers (RiotWeaponId in Shared/WeaponDefs.h), repeated here
+// so this file doesn't need that header - its inline functions don't compile
+// the same way in every copy of the source release.
+enum
+{
+	VRGUN_PULSERIFLE      = 0,
+	VRGUN_LASERCANNON     = 1,
+	VRGUN_SPIDER          = 2,
+	VRGUN_BULLGUT         = 3,
+	VRGUN_SNIPERRIFLE     = 4,
+	VRGUN_JUGGERNAUT      = 5,
+	VRGUN_SHREDDER        = 6,
+	VRGUN_REDRIOT         = 8,
+	VRGUN_ENERGYBATON     = 9,
+	VRGUN_ENERGYBLADE     = 10,
+	VRGUN_KATANA          = 11,
+	VRGUN_MONOKNIFE       = 12,
+	VRGUN_COLT45          = 13,
+	VRGUN_SHOTGUN         = 14,
+	VRGUN_ASSAULTRIFLE    = 15,
+	VRGUN_ENERGYGRENADE   = 16,
+	VRGUN_KATOGRENADE     = 17,
+	VRGUN_MAC10           = 18,
+	VRGUN_TOW             = 19,
+	VRGUN_TANTO           = 22,
+};
+
 struct HeldGunModel { int nId; const char* szModel; const char* szSkin; };
 static const HeldGunModel s_HeldGuns[] =
 {
-	{ GUN_PULSERIFLE_ID,	"Models\\Powerups\\PulseRifle.abc",		"Skins\\Powerups\\PulseRifle_a.dtx" },
-	{ GUN_SHREDDER_ID,		"Models\\Powerups\\Shredder.abc",		"Skins\\Powerups\\Shredder_a.dtx" },
-	{ GUN_BULLGUT_ID,		"Models\\Powerups\\Bullgut.abc",		"Skins\\Powerups\\Bullgut_a.dtx" },
-	{ GUN_JUGGERNAUT_ID,	"Models\\Powerups\\Juggernaut.abc",		"Skins\\Powerups\\Juggernaut_a.dtx" },
-	{ GUN_SPIDER_ID,		"Models\\Powerups\\Spider.abc",			"Skins\\Powerups\\Spider_a.dtx" },
-	{ GUN_REDRIOT_ID,		"Models\\Powerups\\RedRiot.abc",		"Skins\\Powerups\\RedRiot_a.dtx" },
-	{ GUN_SNIPERRIFLE_ID,	"Models\\Powerups\\SniperRifle.abc",	"Skins\\Powerups\\SniperRifle_a.dtx" },
-	{ GUN_ENERGYBATON_ID,	"Models\\Powerups\\EnergyBaton.abc",	"Skins\\Powerups\\EnergyBaton.dtx" },
-	{ GUN_ENERGYBLADE_ID,	"Models\\Powerups\\EnergyBlade.abc",	"Skins\\Powerups\\EnergyBlade.dtx" },
-	{ GUN_KATANA_ID,		"Models\\Powerups\\Katana.abc",			"Skins\\Powerups\\Katana.dtx" },
-	{ GUN_MONOKNIFE_ID,		"Models\\Powerups\\MonoKnife.abc",		"Skins\\Powerups\\MonoKnife.dtx" },
-	{ GUN_COLT45_ID,		"Models\\Powerups\\Colt45.abc",			"Skins\\Powerups\\Colt45_a.dtx" },
-	{ GUN_SHOTGUN_ID,		"Models\\Powerups\\Shotgun.abc",		"Skins\\Powerups\\Shotgun_a.dtx" },
-	{ GUN_MAC10_ID,			"Models\\Powerups\\Machinegun.abc",		"Skins\\Powerups\\Machinegun_a.dtx" },
-	{ GUN_ASSAULTRIFLE_ID,	"Models\\Powerups\\AssaultRifle.abc",	"Skins\\Powerups\\AssaultRifle_a.dtx" },
-	{ GUN_ENERGYGRENADE_ID,	"Models\\Powerups\\EnergyGrenade.abc",	"Skins\\Powerups\\EnergyGrenade_a.dtx" },
-	{ GUN_TOW_ID,			"Models\\Powerups\\TOW.abc",			"Skins\\Powerups\\TOW_a.dtx" },
-	{ GUN_LASERCANNON_ID,	"Models\\Powerups\\LaserCannon.abc",	"Skins\\Powerups\\LaserCannon_a.dtx" },
-	{ GUN_KATOGRENADE_ID,	"Models\\Powerups\\KatoGrenade.abc",	"Skins\\Powerups\\KatoGrenade_a.dtx" },
-	{ GUN_TANTO_ID,			"Models\\Powerups\\Tanto.abc",			"Skins\\Powerups\\Tanto_a.dtx" },
+	{ VRGUN_PULSERIFLE,	"Models\\Powerups\\PulseRifle.abc",		"Skins\\Powerups\\PulseRifle_a.dtx" },
+	{ VRGUN_SHREDDER,		"Models\\Powerups\\Shredder.abc",		"Skins\\Powerups\\Shredder_a.dtx" },
+	{ VRGUN_BULLGUT,		"Models\\Powerups\\Bullgut.abc",		"Skins\\Powerups\\Bullgut_a.dtx" },
+	{ VRGUN_JUGGERNAUT,	"Models\\Powerups\\Juggernaut.abc",		"Skins\\Powerups\\Juggernaut_a.dtx" },
+	{ VRGUN_SPIDER,		"Models\\Powerups\\Spider.abc",			"Skins\\Powerups\\Spider_a.dtx" },
+	{ VRGUN_REDRIOT,		"Models\\Powerups\\RedRiot.abc",		"Skins\\Powerups\\RedRiot_a.dtx" },
+	{ VRGUN_SNIPERRIFLE,	"Models\\Powerups\\SniperRifle.abc",	"Skins\\Powerups\\SniperRifle_a.dtx" },
+	{ VRGUN_ENERGYBATON,	"Models\\Powerups\\EnergyBaton.abc",	"Skins\\Powerups\\EnergyBaton.dtx" },
+	{ VRGUN_ENERGYBLADE,	"Models\\Powerups\\EnergyBlade.abc",	"Skins\\Powerups\\EnergyBlade.dtx" },
+	{ VRGUN_KATANA,		"Models\\Powerups\\Katana.abc",			"Skins\\Powerups\\Katana.dtx" },
+	{ VRGUN_MONOKNIFE,		"Models\\Powerups\\MonoKnife.abc",		"Skins\\Powerups\\MonoKnife.dtx" },
+	{ VRGUN_COLT45,		"Models\\Powerups\\Colt45.abc",			"Skins\\Powerups\\Colt45_a.dtx" },
+	{ VRGUN_SHOTGUN,		"Models\\Powerups\\Shotgun.abc",		"Skins\\Powerups\\Shotgun_a.dtx" },
+	{ VRGUN_MAC10,			"Models\\Powerups\\Machinegun.abc",		"Skins\\Powerups\\Machinegun_a.dtx" },
+	{ VRGUN_ASSAULTRIFLE,	"Models\\Powerups\\AssaultRifle.abc",	"Skins\\Powerups\\AssaultRifle_a.dtx" },
+	{ VRGUN_ENERGYGRENADE,	"Models\\Powerups\\EnergyGrenade.abc",	"Skins\\Powerups\\EnergyGrenade_a.dtx" },
+	{ VRGUN_TOW,			"Models\\Powerups\\TOW.abc",			"Skins\\Powerups\\TOW_a.dtx" },
+	{ VRGUN_LASERCANNON,	"Models\\Powerups\\LaserCannon.abc",	"Skins\\Powerups\\LaserCannon_a.dtx" },
+	{ VRGUN_KATOGRENADE,	"Models\\Powerups\\KatoGrenade.abc",	"Skins\\Powerups\\KatoGrenade_a.dtx" },
+	{ VRGUN_TANTO,			"Models\\Powerups\\Tanto.abc",			"Skins\\Powerups\\Tanto_a.dtx" },
 	{ -1, 0, 0 }
 };
 

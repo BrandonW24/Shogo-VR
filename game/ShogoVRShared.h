@@ -19,9 +19,9 @@
 #ifndef __SHOGOVR_SHARED_H__
 #define __SHOGOVR_SHARED_H__
 
-#define SHOGOVR_SHARED_NAME		"Local\\ShogoVR_Shared_v2"
+#define SHOGOVR_SHARED_NAME		"Local\\ShogoVR_Shared_v3"
 #define SHOGOVR_MAGIC			0x52564F53	/* 'SOVR' */
-#define SHOGOVR_VERSION			2
+#define SHOGOVR_VERSION			3
 
 // bridgeFlags
 #define SHOGOVR_BRIDGE_HEADSET_ACTIVE	0x00000001	// headset session is running and showing us
@@ -126,6 +126,8 @@ typedef struct ShogoVRShared_t
 	long			captureHeight;
 	long			captureFormat;		// DXGI_FORMAT
 	long			captureFrame;		// counts copied frames
+	long			capturePoseId;		// the pose the copied frame was rendered from - written with
+										// the frame, under the keyed mutex, so the two always match
 } ShogoVRShared;
 
 #pragma pack(pop)

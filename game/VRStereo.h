@@ -124,6 +124,8 @@ class CVRStereo
 		// held.  Transforming is server-side and only reacts to a real key
 		// press, so the key bound to it gets pressed for you.
 		void	SetMechMode(DBOOL bMech, DBOOL bVehicle);
+		DBOOL	GameHasFocus();
+		void	HideAimHelpers();
 
 		// ShogoVR\ShogoVR_game.log: notable events with the time, for bug reports.
 		void	Log(const char* szFormat, ...);
@@ -321,7 +323,10 @@ class CVRStereo
 		int			m_nMenuDir;
 		DFLOAT		m_fMenuRepeatTime;
 		DFLOAT		m_fWorldScaleUsed;
-		HLOCALOBJ	m_hAimMarker;
+		HLOCALOBJ	m_hAimMarker;		// reticle (the game's third-person crosshair sprite)
+		HLOCALOBJ	m_hAimDot;			// red dot
+		HLOCALOBJ	m_hLaser;			// laser beam (a line system)
+		HDELINE		m_hLaserLines[5];
 
 		// Two-handed aiming: the gun points from the gun hand towards the other hand
 		DBOOL		m_bTwoHanded;
@@ -402,7 +407,9 @@ class CVRStereo
 		VarTrack	m_vtGunX;			// VRGunX/Y/Z       nudge the gun model in your hand (game units)
 		VarTrack	m_vtGunY;
 		VarTrack	m_vtGunZ;
-		VarTrack	m_vtAimMarker;		// VRAimMarker      1 = show a dot where the gun points
+		VarTrack	m_vtAimMarker;		// VRAimMarker      0 = no aim helper (older setting)
+		VarTrack	m_vtAimStyle;		// VRAimStyle       0 laser + dot, 1 dot, 2 reticle, 3 none
+		VarTrack	m_vtAimDotSize;		// VRAimDotSize     size of the aim dot
 		VarTrack	m_vtGunScale;		// VRGunScale       size of the gun/arms in your hand, on foot
 		VarTrack	m_vtGunScaleMCA;	// VRGunScaleMCA    same, in an MCA
 		VarTrack	m_vtFixRenderer;	// VRFixRenderer    1 = reset the renderer if it draws at the wrong size

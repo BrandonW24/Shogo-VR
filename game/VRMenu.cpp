@@ -57,7 +57,7 @@ static VRMenuSetting s_Settings[VRMENU_ITEMS] =
 	{ "comfort vignette",		"Comfort",	"Vignette",			VRS_RANGE,	0,		0, 1, 0.1f, 100,	"%",		0, { 0 }, { 0 } },
 	{ "lean with head (6dof)",	"Game",		"VRHeadPosition",	VRS_TOGGLE,	1,		0, 1, 1, 1,			"",			0, { 0 }, { 0 } },
 	{ "stereo depth",			"Game",		"VRIPD",			VRS_RANGE,	64,		50, 80, 1, 1,		" mm",		0, { 0 }, { 0 } },
-	{ "aim dot",				"Game",		"VRAimMarker",		VRS_TOGGLE,	1,		0, 1, 1, 1,			"",			0, { 0 }, { 0 } },
+	{ "aim helper",				"Game",		"VRAimStyle",		VRS_CHOICE,	2,		0, 0, 0, 1,			"",			4, { "laser", "dot", "reticle", "none" }, { 0, 1, 2, 3 } },
 	{ "show body",				"Game",		"VRBody",			VRS_TOGGLE,	1,		0, 1, 1, 1,			"",			0, { 0 }, { 0 } },
 	{ "body arms",				"Game",		"VRBodyArms",		VRS_CHOICE,	0,		0, 0, 0, 1,			"",			2, { "hidden", "shown" }, { 0, 1 } },
 	{ "gun model",				"Game",		"VRGunModel",		VRS_CHOICE,	0,		0, 0, 0, 1,			"",			2, { "first person (detailed)", "third person (simple)" }, { 0, 1 } },

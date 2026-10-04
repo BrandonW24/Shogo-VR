@@ -58,13 +58,11 @@ static std::vector<SettingDef> SettingDefs()
 	slider(L"Comfort", L"Vignette",		L"Comfort vignette",	0,	0, 1, 0.05, 100, L"%", 0);
 	check (L"Game",	L"VRHeadPosition",	L"Lean and move with your head (6DoF)", 1, 0);
 	slider(L"Game",	L"VRIPD",			L"Stereo depth (eye distance)", 64, 50, 80, 1, 1, L" mm", 0);
-	check (L"Game",	L"VRAimMarker",		L"Show aim dot",		1,	0);
 	check (L"Game",	L"VRBody",			L"Show your body",		1,	0);
 	check (L"Game",	L"VRBodyArms",		L"Show the body's arms (they can't follow your hands)", 0, 0);
 	check (L"Game",	L"VREasyLadders",	L"Easy ladders (the stick climbs up and down)", 1, 0);
-	combo (L"Launch", L"Method",		L"Start the game",		0,	{ { L"Through Shogo's own launcher", 0 }, { L"Directly (Client.exe)", 1 } }, 0);
 
-	// Column 1: HUD, screens and picture
+	// Column 1: HUD, gun and aim
 	slider(L"Game",	L"VRHudWidth",		L"HUD width",			60,	30, 110, 1, 1, L"\u00B0", 1);
 	slider(L"Game",	L"VRHudDepth",		L"HUD distance",		3.5, 1, 10, 0.5, 1, L" m", 1);
 	combo (L"Game",	L"VRHudStrip",		L"Sharp HUD panel",		-1,	{ { L"Automatic", -1 }, { L"Always", 1 }, { L"Never", 0 } }, 1);
@@ -73,13 +71,23 @@ static std::vector<SettingDef> SettingDefs()
 	check (L"Game",	L"VRGunArms",		L"Show Sanjuro's arms on the first-person gun", 1, 1);
 	slider(L"Game",	L"VRGunScale",		L"Gun size (on foot)",	1.5, 0.5, 3, 0.1, 1, L"\u00D7", 1);
 	slider(L"Game",	L"VRGunScaleMCA",	L"Gun size (in a mech)", 1, 0.5, 3, 0.1, 1, L"\u00D7", 1);
-	slider(L"Picture", L"Sharpen",		L"Sharpening",			0.5, 0, 1, 0.05, 100, L"%", 1);
-	check (L"Picture", L"Upscale",		L"Upscale to the headset's resolution", 1, 1);
-	check (L"Window", L"KeepFocus",		L"Keep Shogo in focus while in VR", 1, 1);
-	check (L"Launch", L"SkipMovies",	L"Skip the intro movies", 0, 1);
-	combo (L"Launch", L"VramMB",		L"Video memory (dgVoodoo)", 2048, { { L"Leave as it is", 0 }, { L"1 GB", 1024 }, { L"2 GB", 2048 }, { L"3 GB", 3072 }, { L"4 GB", 4096 } }, 1);
-	check (L"Picture", L"DirectCapture",	L"Take the picture straight from the game's renderer", 1, 1);
-	check (L"Picture", L"Spectator",	L"Left-eye window on the desktop (for recording)", 0, 1);
+	combo (L"Game",	L"VRAimStyle",		L"Aim helper",			2,	{ { L"Laser and dot", 0 }, { L"Dot", 1 }, { L"Reticle", 2 }, { L"None", 3 } }, 1);
+	slider(L"Game",	L"VRAimDotSize",	L"Aim dot size",		1, 0.5, 3, 0.25, 1, L"\u00D7", 1);
+
+	// "Picture" tab - column 2: picture quality
+	combo (L"Launch", L"RenderScale",	L"Render resolution (dgVoodoo)", 2, { { L"The game's resolution", 1 }, { L"2\u00D7 - sharper 3D", 2 } }, 2);
+	combo (L"Launch", L"Antialiasing",	L"Smooth edges (dgVoodoo)", 2, { { L"The game's choice", 0 }, { L"2\u00D7", 2 }, { L"4\u00D7", 4 }, { L"8\u00D7", 8 } }, 2);
+	combo (L"Launch", L"Anisotropic",	L"Texture filtering (dgVoodoo)", 16, { { L"The game's choice", 0 }, { L"Sharp at angles (16\u00D7)", 16 } }, 2);
+	slider(L"Picture", L"Sharpen",		L"Sharpening",			0.5, 0, 1, 0.05, 100, L"%", 2);
+	check (L"Picture", L"Upscale",		L"Upscale to the headset's resolution", 1, 2);
+	combo (L"Launch", L"VramMB",		L"Video memory (dgVoodoo)", 2048, { { L"Leave as it is", 0 }, { L"1 GB", 1024 }, { L"2 GB", 2048 }, { L"3 GB", 3072 }, { L"4 GB", 4096 } }, 2);
+
+	// "Picture" tab - column 3: capture and starting the game
+	check (L"Picture", L"DirectCapture",	L"Take the picture straight from the game's renderer", 1, 3);
+	check (L"Picture", L"Spectator",	L"Left-eye window on the desktop (for recording)", 0, 3);
+	check (L"Window", L"KeepFocus",		L"Keep Shogo in focus while in VR", 1, 3);
+	check (L"Launch", L"SkipMovies",	L"Skip the intro movies", 0, 3);
+	combo (L"Launch", L"Method",		L"Start the game",		0,	{ { L"Through Shogo's own launcher", 0 }, { L"Directly (Client.exe)", 1 } }, 3);
 	return d;
 }
 
@@ -92,6 +100,8 @@ struct SettingsUI
 	std::vector<HWND>			ctrl;		// one control per setting
 	std::vector<HWND>			valueLbl;	// slider value labels
 	std::vector<HWND>			all;		// every window the panel made (to show/hide)
+	int							page = 0;	// 0 = VR Settings, 1 = Picture
+	int							idBase = 1000;
 	bool						loading = false;
 };
 
@@ -220,11 +230,15 @@ static void ResetDefaults(SettingsUI& ui)
 // Builds the settings controls inside `parent`, two columns, starting at
 // (left, top), `width` wide.  Returns the height used.
 static int CreateSettingsPanel(SettingsUI& ui, HWND parent, HFONT font, HFONT headFont, int left, int top, int width,
-							   const std::wstring& modDir)
+							   const std::wstring& modDir, int page = 0)
 {
 	using gui::S;
 	ui.ini = JoinPath(modDir, L"ShogoVR.ini");
-	ui.defs = SettingDefs();
+	ui.page = page;
+	ui.idBase = ID_BASE + page * 500;		// each panel has its own control ids
+	ui.defs.clear();
+	for (const SettingDef& d : SettingDefs())
+		if (d.column / 2 == page) { ui.defs.push_back(d); ui.defs.back().column = d.column % 2; }
 	ui.ctrl.assign(ui.defs.size(), nullptr);
 	ui.valueLbl.assign(ui.defs.size(), nullptr);
 	ui.all.clear();
@@ -241,8 +255,8 @@ static int CreateSettingsPanel(SettingsUI& ui, HWND parent, HFONT font, HFONT he
 	const int colGap = S(28), rowH = S(27);
 	const int colW = (width - colGap) / 2;
 	const int valW = S(58), labelW = (colW - valW) * 45 / 100, ctrlW = colW - valW - labelW;
-	make(L"STATIC", L"CONTROLS && COMFORT", SS_LEFT, left, top, colW, S(20), 0, headFont);
-	make(L"STATIC", L"HUD, SCREENS && PICTURE", SS_LEFT, left + colW + colGap, top, colW, S(20), 0, headFont);
+	make(L"STATIC", page == 0 ? L"CONTROLS && COMFORT" : L"PICTURE QUALITY", SS_LEFT, left, top, colW, S(20), 0, headFont);
+	make(L"STATIC", page == 0 ? L"HUD, GUN && AIM" : L"CAPTURE && STARTING THE GAME", SS_LEFT, left + colW + colGap, top, colW, S(20), 0, headFont);
 	int rowsTop = top + S(28);
 
 	int rowIdx[2] = { 0, 0 };
@@ -251,7 +265,7 @@ static int CreateSettingsPanel(SettingsUI& ui, HWND parent, HFONT font, HFONT he
 		const SettingDef& s = ui.defs[i];
 		int x = left + s.column * (colW + colGap);
 		int y = rowsTop + rowIdx[s.column]++ * rowH;
-		int id = ID_BASE + (int)i;
+		int id = ui.idBase + (int)i;
 
 		if (s.type == ST_CHECK)
 		{
@@ -284,8 +298,8 @@ static void ShowSettingsPanel(SettingsUI& ui, bool show)
 static bool SettingsHandleCommand(SettingsUI& ui, WPARAM wp)
 {
 	int id = LOWORD(wp), code = HIWORD(wp);
-	if (id < ID_BASE || id >= ID_BASE + (int)ui.defs.size()) return false;
-	size_t i = (size_t)(id - ID_BASE);
+	if (id < ui.idBase || id >= ui.idBase + (int)ui.defs.size()) return false;
+	size_t i = (size_t)(id - ui.idBase);
 	if ((ui.defs[i].type == ST_COMBO && code == CBN_SELCHANGE) || (ui.defs[i].type == ST_CHECK && code == BN_CLICKED))
 		SaveControl(ui, i);
 	return true;

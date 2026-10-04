@@ -32,6 +32,7 @@ typedef HRESULT (WINAPI *CreateDeviceAndSwapChainFn)(IDXGIAdapter*, D3D_DRIVER_T
 													  UINT, UINT, const DXGI_SWAP_CHAIN_DESC*, IDXGISwapChain**,
 													  ID3D11Device**, D3D_FEATURE_LEVEL*, ID3D11DeviceContext**);
 
+static volatile long s_nFramePose = 0;		// pose of the frame being drawn
 static void**			s_vtbl			= NULL;		// swap chain function table we patched
 static void**			s_vtbl1			= NULL;
 static PresentFn		s_origPresent	= NULL;
@@ -141,6 +142,7 @@ static void CaptureFrom(IDXGISwapChain* pSC)
 				else pCtx->CopyResource(s_tex, pBack);
 				pCtx->Release();
 			}
+			s_pShared->capturePoseId = s_nFramePose;		// under the mutex: the bridge reads it with this frame
 			s_mutex->ReleaseSync(1);
 			s_pShared->captureFrame = ++s_frames;
 		}
@@ -293,6 +295,8 @@ void VRCapture_Uninstall()
 	ReleaseShared();
 	s_pShared = NULL;
 }
+
+void VRCapture_SetFramePose(long nPoseId) { s_nFramePose = nPoseId; }
 
 int VRCapture_Frames()
 {
