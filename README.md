@@ -166,7 +166,7 @@ It'll really help me solve any issues you may encounter!
 * Virtual Desktop displays the game entirely upside down
 * Launcher error `0xC0000005` is related to the launcher crashing
 * Vignetting does not seem to work properly
-* If you alt-tab, the game will likely crash
+* Alt-tabbing is super likely to cause the game to crash
 * ~~With Quest 3 & Quest 2 controllers there seems to be no way to bring up the in-game menu....~~
   * ~~**TODO: Make buttons rebindable & accessible from the launcher**~~
 
