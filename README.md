@@ -121,7 +121,7 @@ Your new `ShogoVR` folder holds four logs, each rewritten every run. Please atta
 
 If it helps, I find that these settings in particular can be the cause of a lot of crashes, generally speaking 2gb of video memory should be stable. Allocating more memory can lead to instability.
 
-If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way.
+~~If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way. Out of date tip, but you can still try this if you're experiencing stability issues with older versions of the release or with the newest version, I am keeping this here in case it could help somebody~~
 
 
 
@@ -130,6 +130,15 @@ If you are still having stability issues, try disabling the last two bools here 
 
 
 An additional note, when ShogoVR crashes, there might be a left over ShogoVRBridge process that you will need to end in your task manager. It does not have a window so it is really easy to miss.
+
+If you can, please the logs to bug reports where relevant:
+
+- `ShogoVR_launch.log`: what the launcher did.
+- `ShogoVRBridge.log`: window, focus, capture and settings.
+- `ShogoVR_game.log`: player mode, camera FOV, zoom, resolution and renderer events.
+- `ShogoVR_crash` : a crash dump file
+
+It'll really help me solve any issues you may encounter!
 
 ## Known Issues
 
