@@ -133,15 +133,25 @@ An additional note, when ShogoVR crashes, there might be a left over ShogoVRBrid
 ## Known Issues
 
 * Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.
-* The launcher will often not launch ShogoVR properly (lol), see above on how to launch the mod without the ShogoVR launcher
+  * 10/3/2026 Still occurring
+
+* ~~The launcher will often not launch ShogoVR properly (lol), see above on how to launch the mod without the ShogoVR launcher~~
 * The game can and will crash at random.
+  * 10/3/2026 Added a crash reporter to help diagnose random crashes
+
 * The game will sometimes crash in the menu
+  * I noticed that when you're navigating the menu *too* quickly Shogo implodes? Could be a cause, could also not be at the same time.
+
 * VR body simulation is a bit wonky
 * ~~Crouch in pilot/Sanjuro mode seems to be busted / not bound correctly at the moment~~
   * It does work and is correctly bound, only your view point does not change to give you the feeling that you are crouching, will fix!
 
-* Clarity still needs some work
+* ~~Clarity still needs some work~~
+  * Fixed with release 1.1.2
+
 * Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
+  * It appears to fix itself after a couple minutes?
+
 * Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
 * Virtual Desktop displays the game entirely upside down
 * Launcher error `0xC0000005` is related to the launcher crashing
