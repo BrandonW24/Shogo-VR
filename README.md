@@ -102,11 +102,12 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 
 ## Troubleshooting
 
-Your new `ShogoVR` folder holds three logs, each rewritten every run. Please attach them to bug reports:
+Your new `ShogoVR` folder holds four logs, each rewritten every run. Please attach them to bug reports:
 
 - `ShogoVR_launch.log`: what the launcher did.
 - `ShogoVRBridge.log`: window, focus, capture and settings.
 - `ShogoVR_game.log`: player mode, camera FOV, zoom, resolution and renderer events.
+- `ShogoVR_crash` : a crash dump file
 
 **If the launcher can't start the game on your PC, or if it crashes before you see anything in your VR headset**, start Shogo once from `Shogo.exe` with `-rez ShogoVR` in the advanced options in the command line like the following : 
 
