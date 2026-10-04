@@ -131,7 +131,7 @@ If it helps, I find that these settings in particular can be the cause of a lot 
 
 An additional note, when ShogoVR crashes, there might be a left over ShogoVRBridge process that you will need to end in your task manager. It does not have a window so it is really easy to miss.
 
-If you can, please the logs to bug reports where relevant:
+If you can, please attach the logs to bug reports where relevant:
 
 - `ShogoVR_launch.log`: what the launcher did.
 - `ShogoVRBridge.log`: window, focus, capture and settings.
