@@ -182,6 +182,7 @@ It'll really help me solve any issues you may encounter!
 | `launcher/` | The launcher, settings window and installer (Win32, no dependencies), with their artwork and icon. |
 | `game/` | The mod's own game-side source files (stereo rendering, VR menu, direct capture). |
 | `tools/leakcheck.py` | Checks that nothing from Monolith's source has slipped into this repository. |
+| `tools/makepayload.py` | Packs the files the installer carries into `payload.bin`, which the installer builder embeds (see `launcher/BUILD.txt`). |
 
 **Not included:** Monolith's Shogo source code. The VR game code (`CShell.dll`) is built from Monolith's Shogo v2.2 source release. Its licence lets mods be shared free of charge but forbids redistributing the source, so `CShell.dll` ships only in compiled form, inside the installer. For the same reason, the edits that connect `game/` into Monolith's own files aren't published here.
 
