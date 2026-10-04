@@ -182,6 +182,97 @@ static bool PakRead(const std::vector<char>& exe, uint64_t& stubSize, std::vecto
 	return true;
 }
 
+// ----------------------------------------------------------------------- //
+//  Payload as a resource (RCDATA 200) - the current format.  The files live
+//  in the program's own resources, the standard place for a program's data,
+//  rather than appended after its end (an "overlay", which security scanners
+//  associate with malware droppers).
+//  Blob: [magic 16][count u32] per file: [nameLen u32][name][size u64], then
+//  the file data in the same order.
+// ----------------------------------------------------------------------- //
+
+enum { SHOGOVR_PAYLOAD_ID = 200 };
+static const char k_PakResMagic[16] = "SHOGOVR-RES-v1";
+
+static std::vector<char> PakSerialize(const std::vector<PakFile>& files)
+{
+	std::vector<char> out;
+	auto put = [&](const void* d, size_t n) { out.insert(out.end(), (const char*)d, (const char*)d + n); };
+	put(k_PakResMagic, sizeof(k_PakResMagic));
+	uint32_t count = (uint32_t)files.size();
+	put(&count, 4);
+	for (const PakFile& f : files)
+	{
+		uint32_t nameLen = (uint32_t)f.name.size();
+		uint64_t size = f.data.size();
+		put(&nameLen, 4);
+		put(f.name.data(), nameLen);
+		put(&size, 8);
+	}
+	for (const PakFile& f : files) put(f.data.data(), f.data.size());
+	return out;
+}
+
+static bool PakDeserialize(const char* data, size_t n, std::vector<PakFile>& files)
+{
+	files.clear();
+	const char* p = data;
+	const char* end = data + n;
+	auto take = [&](void* out, size_t k) { if ((size_t)(end - p) < k) return false; memcpy(out, p, k); p += k; return true; };
+	char magic[16];
+	if (!take(magic, 16) || memcmp(magic, k_PakResMagic, 16) != 0) return false;
+	uint32_t count = 0;
+	if (!take(&count, 4) || count > 1000) return false;
+	std::vector<uint64_t> sizes;
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		uint32_t nameLen = 0;
+		uint64_t size = 0;
+		if (!take(&nameLen, 4) || nameLen > 1024 || (size_t)(end - p) < nameLen) return false;
+		PakFile f;
+		f.name.assign(p, nameLen);
+		p += nameLen;
+		if (!take(&size, 8)) return false;
+		files.push_back(std::move(f));
+		sizes.push_back(size);
+	}
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		if ((uint64_t)(end - p) < sizes[i]) { files.clear(); return false; }
+		files[i].data.assign(p, p + sizes[i]);
+		p += sizes[i];
+	}
+	return true;
+}
+
+// The files carried in this program's own resources.
+static bool PakReadSelf(std::vector<PakFile>& files)
+{
+	HRSRC res = FindResourceW(nullptr, MAKEINTRESOURCEW(SHOGOVR_PAYLOAD_ID), MAKEINTRESOURCEW(10) /* RT_RCDATA */);
+	if (!res) return false;
+	HGLOBAL h = LoadResource(nullptr, res);
+	const char* data = h ? (const char*)LockResource(h) : nullptr;
+	DWORD size = SizeofResource(nullptr, res);
+	return data && size && PakDeserialize(data, size, files);
+}
+
+// A copy of this program with its payload resource replaced by files - how
+// the installer builder makes ShogoVR-Setup.exe.
+static bool PakWriteResource(const std::wstring& outPath, const std::vector<PakFile>& files)
+{
+	if (!CopyFileW(ExePath().c_str(), outPath.c_str(), FALSE)) return false;
+	SetFileAttributesW(outPath.c_str(), FILE_ATTRIBUTE_NORMAL);
+	std::vector<char> blob = PakSerialize(files);
+	HANDLE h = BeginUpdateResourceW(outPath.c_str(), FALSE);
+	if (!h) return false;
+	BOOL ok = UpdateResourceW(h, MAKEINTRESOURCEW(10) /* RT_RCDATA */, MAKEINTRESOURCEW(SHOGOVR_PAYLOAD_ID),
+							  MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), blob.data(), (DWORD)blob.size());
+	if (!EndUpdateResourceW(h, ok ? FALSE : TRUE)) return false;
+	return ok != FALSE;
+}
+
+// Older format: files appended after the program (an overlay), read only so
+// that setup programs made by earlier versions still work.
 // Writes stub + files + index + footer to outPath.
 static bool PakWrite(const std::wstring& outPath, const std::vector<char>& exe, uint64_t stubSize,
 					 const std::vector<PakFile>& files)

@@ -120,7 +120,7 @@ static int Build(const std::vector<char>& self, uint64_t stubSize, std::vector<P
 	files.push_back(std::move(f));
 
 	if (outPath.empty()) outPath = JoinPath(DirOf(ExePath()), L"ShogoVR-Setup.exe");
-	if (!PakWrite(outPath, self, stubSize, files)) { Say(L"Couldn't write " + outPath, MB_ICONERROR); return 1; }
+	if (!PakWriteResource(outPath, files)) { Say(L"Couldn't write " + outPath, MB_ICONERROR); return 1; }
 
 	Say(L"Created the installer:\n" + outPath + L"\n\nThat single file is all anyone needs to install Shogo VR.");
 	return 0;
@@ -647,7 +647,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
 	uint64_t stubSize = 0;
 	std::vector<PakFile> files;
 	if (!ReadWholeFile(ExePath(), self)) { Say(L"Couldn't read the setup program itself.", MB_ICONERROR); return 1; }
-	PakRead(self, stubSize, files);
+	if (!PakReadSelf(files)) PakRead(self, stubSize, files);		// resource; older setups: overlay
 
 	bool bHasDll = PakFind(files, "ShogoVR/CShell.dll") != nullptr;
 	bool bHasRest = PakFind(files, "ShogoVR/ShogoVR.exe") && PakFind(files, "ShogoVR/ShogoVRBridge.exe");
