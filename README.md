@@ -94,11 +94,14 @@ The installer and launcher aren't code-signed. If Windows shows "Windows protect
 - **Remapping:** buttons can be changed in the launcher's own dedicated remapping page as seen below : 
   <p align="center"><img src="launcher/assets/rebind_menu.png" alt="Shogo VR" width="640"></p>
 
-## Best picture
+## Image Quality Inside of Your Headset
 
-- **Resolution:** pick a high resolution in Shogo, such as 3840×2160. With NVIDIA DSR or AMD VSR enabled, those resolutions appear even on a 1080p desktop. The Shogo window may then be larger than your screen; that's expected.
-- **Video memory:** the mod sets dgVoodoo's emulated video memory to 2 GB, because its 256 MB default makes textures blurrier the longer you play. Your original `dgVoodoo.conf` is kept as `dgVoodoo.conf.shogovr-backup`.
-- **Hotkeys:** Ctrl+Shift+S (sharpening), Ctrl+Shift+U (upscaling), Ctrl+Shift+M (left-eye window), Ctrl+Shift+R (recenter), Ctrl+Shift+F (fix the game window).
+Personally I have found these settings to produce a very clear image inside of the headsets that I have tested with. That said I do not have perfect eyesight; your standards for a clear image may differ from mine. You can adjust these values if you wish. 
+<p align="center"><img src="launcher/assets/picture_settings.png" alt="Shogo VR" width="640"></p>
+
+A note on this page : 
+
+- "Video memory dgVoodoo" : the mod sets dgVoodoo's emulated video memory to 2 GB, because its 256 MB default makes textures blurrier the longer you play. Your original `dgVoodoo.conf` is kept as `dgVoodoo.conf.shogovr-backup`. 2gb seems to be a good sweet spot, any higher may introduce some instability but you are welcome to try it.
 
 ## Troubleshooting
 
