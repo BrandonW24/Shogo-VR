@@ -122,9 +122,13 @@ Your new `ShogoVR` folder holds four logs, each rewritten every run. Please atta
 
 
 
+If you find that you are disconnected from your (Sanjuro's body) press the left thumbstick down, that is your recenter button.
+
+
+
 If it helps, I find that these settings in particular can be the cause of a lot of crashes, generally speaking 2gb of video memory should be stable. Allocating more memory can lead to instability.
 
-~~If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way. Out of date tip, but you can still try this if you're experiencing stability issues with older versions of the release or with the newest version, I am keeping this here in case it could help somebody~~
+~~If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way. **Out of date tip**, but you can still try this if you're experiencing stability issues with older versions of the release or with the newest version, I am keeping this here in case it could help somebody~~
 
 
 
@@ -145,24 +149,28 @@ It'll really help me solve any issues you may encounter!
 
 ## Known Issues
 
-* Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.
-  * 10/3/2026 Still occurring
+* ~~Often the launcher after installation and upon first launch will not be able to launch ShogoVR properly.~~
+  * ~~10/3/2026 Still occurring~~
 
 * ~~The launcher will often not launch ShogoVR properly (lol), see above on how to launch the mod without the ShogoVR launcher~~
 * The game can and will crash at random.
   * 10/3/2026 Added a crash reporter to help diagnose random crashes
-
+  * Game often crashes after attempting to load a save file
+    * Game will often crash after pressing buttons during the loading process
+  
 * The game will sometimes crash in the menu
   * I noticed that when you're navigating the menu *too* quickly Shogo implodes? Could be a cause, could also not be at the same time.
 
 * VR body simulation is a bit wonky
+  * MCAs have a lot of geometry that clips into your face
+
 * ~~Crouch in pilot/Sanjuro mode seems to be busted / not bound correctly at the moment~~
-  * It does work and is correctly bound, only your view point does not change to give you the feeling that you are crouching, will fix!
+  * ~~It does work and is correctly bound, only your view point does not change to give you the feeling that you are crouching, will fix!~~
 
 * ~~Clarity still needs some work~~
   * Fixed with release 1.1.2
 
-* Transforming from vehicle mode back to mech mode will bug your body's animations (I recommend disabling the body in the options when this happens for now)
+* Transforming from vehicle mode back to mech mode will bug your MCA's body animations (I recommend disabling the body in the options when this happens for now)
   * It appears to fix itself after a couple minutes?
 
 * Selecting the "display" option in your settings menu will crash the game outright, avoid it at all costs for now
