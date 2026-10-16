@@ -32,7 +32,9 @@ https://youtu.be/d2rjNoYvyQU
    
 - **Left handed mode**
   
-- **Proper VR hands with multiple poses**
+- **Proper VR hands with multiple poses** Including open hand, finger point, finger trigger pull, fist, and the OK hand signal.
+  
+- **Two handed weapons** all weapons except for the akimbo pistols can be two-handed. _Hand positioning on your secondary hand is still WIP and a little wonky at the moment._
   
 - **Haptic feedback & recoil simulation**
   
