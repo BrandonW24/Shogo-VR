@@ -29,12 +29,20 @@ https://youtu.be/d2rjNoYvyQU
 - **A sharp HUD** on its own floating panel, with menus, cutscenes and loading screens on a floating screen.
 
 - **Your body** when you look down, Sanjuro or your mech, animated as you move.
+   
+- **Left handed mode**
+  
+- **Proper VR hands with multiple poses**
+  
+- **Haptic feedback & recoil simulation**
+  
+- **Easy to use VR weapon wheel** to help you swap weapons in the heat of combat!
 
 - **Picture quality:** frames go straight from the game's renderer to the headset, so your monitor doesn't limit them. On top of that come sharpening, upscaling and an optional comfort vignette.
 
 - **A left-eye window** on the desktop, for recording and streaming.
 
-- **A launcher with all the VR settings and rebindable button mapping menu** 
+- **An outside the game VR settings and rebindable button mapping menu**
 
   <p align="center"><img src="launcher/assets/settings_menu.png" alt="Shogo VR" width="640"></p>
 
@@ -133,28 +141,12 @@ Your new `ShogoVR` folder holds four logs, each rewritten every run. Please atta
 - `ShogoVR_game.log`: player mode, camera FOV, zoom, resolution and renderer events.
 - `ShogoVR_crash` : a crash dump file
 
-**If the launcher can't start the game on your PC, or if it crashes before you see anything in your VR headset**, start Shogo once from `Shogo.exe` with `-rez ShogoVR` in the advanced options in the command line like the following : 
 
-<p align="center"><img src="launcher/assets/info.png" alt="Shogo VR" width="720"></p>
-
-
-
- The mod remembers that working command line, and the launcher uses it from then on.
-
-
-
-If you find that you are disconnected from your (Sanjuro's body) press the left thumbstick down, that is your recenter button.
-
+If you find that you are disconnected from your (Sanjuro's body) press the left thumbstick down, that is your default recenter button. You can rebind it in the settings menu
+<img width="933" height="638" alt="image" src="https://github.com/user-attachments/assets/c1d9c73e-4151-493c-b70c-97307ac503e8" />
 
 
 If it helps, I find that these settings in particular can be the cause of a lot of crashes, generally speaking 2gb of video memory should be stable. Allocating more memory can lead to instability.
-
-~~If you are still having stability issues, try disabling the last two bools here in the VR settings. They are experimental features to record better footage with but they currently end up getting in the way. **Out of date tip**, but you can still try this if you're experiencing stability issues with older versions of the release or with the newest version, I am keeping this here in case it could help somebody~~
-
-
-
-<p align="center"><img src="launcher/assets/troubleshooting_1.jpg" alt="Shogo VR" width="720"></p>
-
 
 
 An additional note, when ShogoVR crashes, there might be a left over ShogoVRBridge process that you will need to end in your task manager. It does not have a window so it is really easy to miss.
