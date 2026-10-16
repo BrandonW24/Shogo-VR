@@ -60,19 +60,40 @@ https://youtu.be/d2rjNoYvyQU
 
 ## Install and play
 
-1. Download **ShogoVR-Setup.exe** from [Releases](../../releases) and run it. It finds Shogo, installs the mod into its own `ShogoVR` folder (your game files aren't changed) and adds the shortcuts.
+SHOGO VR - installing by hand
 
-2. Start **Shogo VR** from your Desktop or Start menu and press **Play**.
+1. Copy the ShogoVR folder from this zip into your Shogo folder - the one
+   with Client.exe in it (for example ...\GOG Galaxy\Games\Shogo - Mobile
+   Armor Division, or ...\steamapps\common\Shogo Mobile Armor Division).
+   
+   It should look something like this : 
+<img width="970" height="780" alt="image" src="https://github.com/user-attachments/assets/4335049e-ad6d-420d-9cae-a86d34458738" />
 
-   <p align="center"><img src="launcher/assets/launcher_play.png" alt="Shogo VR" width="720"></p>
+Inside the folder, you should have ShogoVR.exe and ShogoVRBridge.exe
 
-3. In the headset, look straight ahead and click the left thumbstick to recenter yourself in your 3d space. You can also do this through the VR settings menu towards the bottom.
+<img width="696" height="525" alt="image" src="https://github.com/user-attachments/assets/a3d92d44-b62f-4bb8-84c1-d5fcbd36400f" />
 
-If the ShogoVR launcher is unable to launch Shogo which unfortunately is quite common, you can also start Shogo your usual way (`Shogo.exe`, Steam) with `-rez ShogoVR` on its command line; the headset bridge starts by itself. If you know where your Shogo.exe install is, launch that and go into the advanced options and type this into the command line prompt `-rez ShogoVR`
 
-<p align="center"><img src="launcher/assets/info.png" alt="Shogo VR" width="720"></p>
+ShogoVR.exe is now only a settings window. It no longer starts the game. 
+Players start Shogo the normal way with -rez ShogoVR in Shogo's Advanced options
 
-To uninstall, use *Windows Settings → Apps → Installed apps → Shogo VR*.
+   
+2. Open Shogo's own launcher (Shogo.exe), click Advanced..., put
+   -rez ShogoVR in the Command-Line box, tick "Always specify these
+   command-line parameters" and click OK.
+   
+<img width="1589" height="965" alt="image" src="https://github.com/user-attachments/assets/575ad459-335b-4c55-a03b-c0db0cf329c9" />
+
+3. Make sure you have SteamVR on and have connected your headset via Steamlink or via wired connection. 
+
+
+4. Start Shogo from the normal launcher 
+<img width="434" height="382" alt="image" src="https://github.com/user-attachments/assets/f63ac04c-2046-4d6f-82ea-ca1dcea4fcaa" />
+
+5. Enjoy Shogo in VR :)
+
+
+**To uninstall**, obliterate the shogoVR folder and it's gone.
 
 The installer and launcher aren't code-signed. If Windows shows "Windows protected your PC", choose *More info → Run anyway*.
 
