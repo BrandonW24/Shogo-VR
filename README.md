@@ -4,7 +4,7 @@
 
 **Play Shogo: Mobile Armor Division (1998) in a PC VR headset.**
 
-**Shogo VR** is an **unofficial VR mod**, unaffiliated with Monolith Productions or any of its affiliates and subsidiaries. 
+**Shogo VR** is an **unofficial VR mod** for Shogo : Mobile Armor Division, it is a mod unaffiliated with Monolith Productions or any of its affiliates and subsidiaries. 
 
 **It's free**, and you need your own copy of the game.
 
