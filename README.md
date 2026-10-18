@@ -85,7 +85,7 @@ Inside the folder, you should have ShogoVR.exe and ShogoVRBridge.exe
 
 
 ShogoVR.exe is now only a settings window. It no longer starts the game. 
-you'll start Shogo the normal way with your Shogo.exe with -rez ShogoVR in Shogo's launcher's Advanced options
+you'll start Shogo the normal way with your Shogo.exe with `-rez ShogoVR` in Shogo's launcher's Advanced options
 
    
 2. Open Shogo's own launcher (Shogo.exe), click Advanced..., put
