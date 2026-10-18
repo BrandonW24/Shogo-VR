@@ -72,7 +72,7 @@ https://youtu.be/d2rjNoYvyQU
 
 SHOGO VR - installing by hand
 
-1. Copy the ShogoVR folder from this zip into your Shogo folder - the one
+1. Copy the ShogoVR folder from my latest GitHub release into your Shogo folder - the one
    with Client.exe in it (for example ...\GOG Galaxy\Games\Shogo - Mobile
    Armor Division, or ...\steamapps\common\Shogo Mobile Armor Division).
    
